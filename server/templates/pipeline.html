@@ -1,0 +1,52 @@
+{% extends "base.html" %}
+{% from "_macros.html" import avatar %}
+{% block title %}Pipeline{% endblock %}
+
+{% block content %}
+<div class="section-title">
+  <h2>Pipeline</h2>
+  <form method="get" style="display:inline">
+    <select class="input" style="max-width:260px" name="vacancy" onchange="this.form.submit()">
+      <option value="all" {% if vacancy_filter == 'all' %}selected{% endif %}>All Vacancies</option>
+      {% for v in vacancies %}
+        <option value="{{ v.id }}" {% if vacancy_filter == v.id %}selected{% endif %}>{{ v.title }}</option>
+      {% endfor %}
+    </select>
+  </form>
+</div>
+
+<div class="kanban">
+  {% for s in stages %}
+    <div class="column" data-stage="{{ s.id }}">
+      <div class="column-head">
+        <div class="title">{{ s.label }}</div>
+        <span class="count">{{ by_stage[s.id]|length }}</span>
+      </div>
+      <div class="column-body">
+        {% for c in by_stage[s.id] %}
+          <div class="kcard" draggable="true" data-id="{{ c.id }}" onclick="location.href='{{ url_for('candidate_detail', cid=c.id) }}'">
+            <div class="row-flex">
+              {{ avatar(c.name) }}
+              <div>
+                <div class="n">{{ c.name }}</div>
+                <div class="m">{{ c.headline or '—' }}</div>
+              </div>
+            </div>
+            <div class="r">
+              {% for sk in c.skills[:3] %}<span class="chip">{{ sk }}</span>{% endfor %}
+            </div>
+            <div class="r">
+              {% set d = days_in_stage[c.id] %}
+              <span class="chip {% if d > 14 %}bad{% elif d > 7 %}warn{% else %}ok{% endif %}">{{ d }}d in stage</span>
+            </div>
+          </div>
+        {% endfor %}
+      </div>
+    </div>
+  {% endfor %}
+</div>
+
+{% if not any_candidates %}
+  <div class="card empty" style="margin-top:16px">No candidates in this pipeline yet.</div>
+{% endif %}
+{% endblock %}

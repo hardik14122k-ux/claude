@@ -1,0 +1,47 @@
+{% extends "base.html" %}
+{% block title %}{{ 'Edit interview' if interview else 'Schedule interview' }}{% endblock %}
+
+{% block content %}
+<div class="section-title">
+  <h2>{{ 'Edit Interview' if interview else 'Schedule Interview' }}</h2>
+  <a class="btn" href="{{ url_for('interviews_list') }}">Back</a>
+</div>
+
+<form class="card" method="post">
+  <div class="form-grid">
+    <div class="full">
+      <label>Candidate</label>
+      <select class="input" name="candidate_id" required>
+        <option value="">— Select candidate —</option>
+        {% for c in candidates %}
+          <option value="{{ c.id }}" {% if interview and interview.candidate_id == c.id %}selected{% endif %}>{{ c.name }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div><label>Date &amp; time</label><input class="input" type="datetime-local" name="date" value="{{ interview.date[:16] if interview and interview.date else '' }}" required /></div>
+    <div>
+      <label>Type</label>
+      <select class="input" name="type">
+        {% for t in ['Screening','Technical','Culture','System Design','Final','Reference'] %}
+          <option {% if interview and interview.type == t %}selected{% elif not interview and t == 'Technical' %}selected{% endif %}>{{ t }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div><label>Interviewer</label><input class="input" name="interviewer" value="{{ interview.interviewer if interview else '' }}" /></div>
+    <div>
+      <label>Status</label>
+      <select class="input" name="status">
+        {% for s in ['Scheduled','Completed','Cancelled','No-show'] %}
+          <option {% if interview and interview.status == s %}selected{% elif not interview and s == 'Scheduled' %}selected{% endif %}>{{ s }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div><label>Rating (0-5)</label><input class="input" type="number" min="0" max="5" name="rating" value="{{ interview.rating if interview else 0 }}" /></div>
+    <div class="full"><label>Feedback</label><textarea class="input" name="feedback" rows="4">{{ interview.feedback if interview else '' }}</textarea></div>
+  </div>
+  <div class="row-flex" style="margin-top:14px;justify-content:flex-end">
+    <a class="btn" href="{{ url_for('interviews_list') }}">Cancel</a>
+    <button class="btn primary" type="submit">{{ 'Save' if interview else 'Schedule' }}</button>
+  </div>
+</form>
+{% endblock %}

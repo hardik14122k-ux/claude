@@ -1,0 +1,35 @@
+{% extends "base.html" %}
+{% block title %}{{ 'Edit candidate' if candidate else 'Add candidate' }}{% endblock %}
+
+{% block content %}
+<div class="section-title">
+  <h2>{{ 'Edit ' ~ candidate.name if candidate else 'Add Candidate' }}</h2>
+  <a class="btn" href="{{ url_for('candidates_list') }}">Back</a>
+</div>
+
+<form class="card" method="post">
+  <div class="form-grid">
+    <div><label>Full Name</label><input class="input" name="name" required value="{{ candidate.name if candidate else '' }}" /></div>
+    <div><label>Email</label><input class="input" name="email" value="{{ candidate.email if candidate else '' }}" /></div>
+    <div><label>Phone</label><input class="input" name="phone" value="{{ candidate.phone if candidate else '' }}" /></div>
+    <div><label>Location</label><input class="input" name="location" value="{{ candidate.location if candidate else '' }}" /></div>
+    <div><label>Headline</label><input class="input" name="headline" value="{{ candidate.headline if candidate else '' }}" /></div>
+    <div><label>Experience (years)</label><input class="input" type="number" min="0" name="experience_years" value="{{ candidate.experience_years if candidate else '' }}" /></div>
+    <div><label>Source</label><input class="input" name="source" value="{{ candidate.source if candidate else '' }}" placeholder="LinkedIn / Referral / Career site" /></div>
+    <div>
+      <label>Vacancy</label>
+      <select class="input" name="vacancy_id">
+        <option value="">— None —</option>
+        {% for v in vacancies %}
+          <option value="{{ v.id }}" {% if candidate and candidate.vacancy_id == v.id %}selected{% endif %}>{{ v.title }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="full"><label>Skills (comma separated)</label><input class="input" name="skills" value="{{ (candidate.skills | join(', ')) if candidate else '' }}" /></div>
+  </div>
+  <div class="row-flex" style="margin-top:14px;justify-content:flex-end">
+    <a class="btn" href="{{ url_for('candidates_list') }}">Cancel</a>
+    <button class="btn primary" type="submit">{{ 'Save' if candidate else 'Add' }}</button>
+  </div>
+</form>
+{% endblock %}

@@ -1,0 +1,93 @@
+{% extends "base.html" %}
+{% from "_macros.html" import priority_chip, fmt_date %}
+{% block title %}Dashboard{% endblock %}
+
+{% block content %}
+<div class="grid cards">
+  <div class="card kpi"><div class="kpi-label">Open Vacancies</div><div class="kpi-value">{{ open_vacancies|length }}</div><div class="kpi-sub">{{ total_openings }} openings total</div></div>
+  <div class="card kpi"><div class="kpi-label">Active Candidates</div><div class="kpi-value">{{ active_candidates }}</div><div class="kpi-sub">{{ total_candidates }} total</div></div>
+  <div class="card kpi"><div class="kpi-label">Offers Pending</div><div class="kpi-value">{{ pending_offers }}</div><div class="kpi-sub">Awaiting response</div></div>
+  <div class="card kpi"><div class="kpi-label">Hired · this month</div><div class="kpi-value">{{ hired_this_month }}</div><div class="kpi-sub">{{ total_hired }} all-time</div></div>
+  <div class="card kpi"><div class="kpi-label">Avg. Time-to-Hire</div><div class="kpi-value">{% if avg_time_to_hire %}{{ avg_time_to_hire }}d{% else %}—{% endif %}</div><div class="kpi-sub">Sourced → hired</div></div>
+</div>
+
+<div class="two-col" style="margin-top:16px">
+  <div class="card">
+    <div class="section-title"><h2>Hiring Funnel</h2><span class="muted">{{ total_candidates }} candidates tracked</span></div>
+    <div class="funnel">
+      {% for s in stages if s.id != 'rejected' %}
+        {% set count = funnel[s.id] %}
+        {% set pct = (count / funnel_max * 100) if funnel_max else 0 %}
+        <div class="funnel-row">
+          <div>{{ s.label }}</div>
+          <div class="funnel-bar"><div class="funnel-fill" style="width:{{ pct|round(0) }}%"></div></div>
+          <div style="text-align:right;font-variant-numeric:tabular-nums">{{ count }}</div>
+        </div>
+      {% endfor %}
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="section-title"><h2>TAT Aging — active pipeline</h2></div>
+    <div class="aging">
+      <div class="bucket green"><div class="num">{{ aging['<=3'] }}</div><div class="lbl">≤ 3d</div></div>
+      <div class="bucket green"><div class="num">{{ aging['4-7'] }}</div><div class="lbl">4–7d</div></div>
+      <div class="bucket amber"><div class="num">{{ aging['8-14'] }}</div><div class="lbl">8–14d</div></div>
+      <div class="bucket amber"><div class="num">{{ aging['15-30'] }}</div><div class="lbl">15–30d</div></div>
+      <div class="bucket red"><div class="num">{{ aging['>30'] }}</div><div class="lbl">&gt; 30d</div></div>
+    </div>
+    <div class="sep"></div>
+    <h2 class="sublabel">Avg. days in stage</h2>
+    {% for s in stages if s.sla > 0 %}
+      <div class="row-flex" style="padding:6px 0;border-bottom:1px solid var(--border)">
+        <div style="width:120px">{{ s.label }}</div>
+        <div class="spacer"></div>
+        <span class="chip {% if tat[s.id] > s.sla %}warn{% else %}ok{% endif %}">{{ tat[s.id] }}d <span class="muted" style="margin-left:6px">SLA {{ s.sla }}d</span></span>
+      </div>
+    {% endfor %}
+  </div>
+</div>
+
+<div class="two-col" style="margin-top:16px">
+  <div class="card">
+    <div class="section-title"><h2>Open Vacancies</h2></div>
+    {% if open_vacancies %}
+    <table class="table">
+      <thead><tr><th>Role</th><th>Dept</th><th>Hiring Mgr</th><th>Openings</th><th>Priority</th><th>Age</th></tr></thead>
+      <tbody>
+        {% for v in open_vacancies[:8] %}
+          <tr>
+            <td>
+              <div style="font-weight:600">{{ v.title }}</div>
+              <div class="muted" style="font-size:11px">{{ v.location }}</div>
+            </td>
+            <td>{{ v.department }}</td>
+            <td>{{ v.hiring_manager or '—' }}</td>
+            <td>{{ v.openings }}</td>
+            <td>{{ priority_chip(v.priority) }}</td>
+            <td>{{ vacancy_age[v.id] }}d</td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <div class="empty">No open vacancies — create one to get started.</div>
+    {% endif %}
+  </div>
+
+  <div class="card">
+    <div class="section-title"><h2>Recent activity</h2></div>
+    {% if activity %}
+      {% for a in activity[:10] %}
+        <div class="row-flex" style="padding:6px 0;border-bottom:1px solid var(--border)">
+          <span class="dot {% if a.type.startswith('vacancy') %}ok{% elif a.type.startswith('interview') %}warn{% elif 'rejected' in a.type %}bad{% else %}ok{% endif %}"></span>
+          <div style="flex:1">{{ a.message }}</div>
+          <span class="muted" style="font-size:11px">{{ a.ts.split('T')[0] }}</span>
+        </div>
+      {% endfor %}
+    {% else %}
+      <div class="empty">No activity yet.</div>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

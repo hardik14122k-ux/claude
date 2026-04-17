@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>{% block title %}TalentTrack{% endblock %} · Recruitment Tracker</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}" />
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ctext y='26' font-size='26'%3E%F0%9F%8E%AF%3C/text%3E%3C/svg%3E" />
+</head>
+<body>
+  <aside class="sidebar">
+    <div class="brand">
+      <span class="brand-mark">TT</span>
+      <div>
+        <div class="brand-title">TalentTrack</div>
+        <div class="brand-sub">Recruitment OS · Python</div>
+      </div>
+    </div>
+    <nav id="nav">
+      {% set route = request.endpoint or '' %}
+      <a class="nav-item {{ 'active' if route == 'dashboard' else '' }}" href="{{ url_for('dashboard') }}">Dashboard</a>
+      <a class="nav-item {{ 'active' if route.startswith('vacanc') else '' }}" href="{{ url_for('vacancies_list') }}">Vacancies</a>
+      <a class="nav-item {{ 'active' if route.startswith('candidate') else '' }}" href="{{ url_for('candidates_list') }}">Candidates</a>
+      <a class="nav-item {{ 'active' if route == 'pipeline' else '' }}" href="{{ url_for('pipeline') }}">Pipeline</a>
+      <a class="nav-item {{ 'active' if route.startswith('interview') else '' }}" href="{{ url_for('interviews_list') }}">Interviews</a>
+      <a class="nav-item {{ 'active' if route == 'reports' else '' }}" href="{{ url_for('reports') }}">Reports</a>
+      <a class="nav-item {{ 'active' if route == 'settings' else '' }}" href="{{ url_for('settings_page') }}">Settings</a>
+    </nav>
+    <div class="sidebar-footer">
+      <form method="post" action="{{ url_for('seed_data') }}" style="display:contents">
+        <button class="btn ghost" type="submit">Load demo data</button>
+      </form>
+      <form method="post" action="{{ url_for('reset_data') }}" onsubmit="return confirm('Wipe all data?')" style="display:contents">
+        <button class="btn danger-ghost" type="submit">Reset</button>
+      </form>
+    </div>
+  </aside>
+
+  <main>
+    <header class="topbar">
+      <form class="search" method="get" action="{{ url_for('candidates_list') }}">
+        <input name="q" placeholder="Search candidates, skills, headline..." value="{{ request.args.get('q', '') }}" />
+      </form>
+      <div class="topbar-actions">
+        <a class="btn primary" href="{{ url_for('candidate_upload') }}">+ Upload CV</a>
+        <a class="btn" href="{{ url_for('vacancy_new') }}">+ New Vacancy</a>
+      </div>
+    </header>
+
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% if messages %}
+        <div id="flash">
+          {% for category, msg in messages %}
+            <div class="toast {{ category }}">{{ msg }}</div>
+          {% endfor %}
+        </div>
+      {% endif %}
+    {% endwith %}
+
+    <section class="view">
+      {% block content %}{% endblock %}
+    </section>
+  </main>
+
+  <script src="{{ url_for('static', filename='app.js') }}"></script>
+</body>
+</html>

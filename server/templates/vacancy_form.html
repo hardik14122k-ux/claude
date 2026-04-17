@@ -1,0 +1,45 @@
+{% extends "base.html" %}
+{% block title %}{{ 'Edit vacancy' if vacancy else 'New vacancy' }}{% endblock %}
+
+{% block content %}
+<div class="section-title">
+  <h2>{{ 'Edit "' ~ vacancy.title ~ '"' if vacancy else 'New Vacancy' }}</h2>
+  <a class="btn" href="{{ url_for('vacancies_list') }}">Back</a>
+</div>
+
+<form class="card" method="post">
+  <div class="form-grid">
+    <div><label>Role / Title</label><input class="input" name="title" required value="{{ vacancy.title if vacancy else '' }}" placeholder="Senior Backend Engineer" /></div>
+    <div><label>Department</label><input class="input" name="department" value="{{ vacancy.department if vacancy else '' }}" /></div>
+    <div><label>Location</label><input class="input" name="location" value="{{ vacancy.location if vacancy else '' }}" /></div>
+    <div><label>Hiring Manager</label><input class="input" name="hiring_manager" value="{{ vacancy.hiring_manager if vacancy else '' }}" /></div>
+    <div><label>Openings</label><input class="input" type="number" min="1" name="openings" value="{{ vacancy.openings if vacancy else 1 }}" /></div>
+    <div>
+      <label>Priority</label>
+      <select class="input" name="priority">
+        {% for p in ['High','Medium','Low'] %}
+          <option {% if vacancy and vacancy.priority == p %}selected{% elif not vacancy and p == 'Medium' %}selected{% endif %}>{{ p }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div>
+      <label>Status</label>
+      <select class="input" name="status">
+        {% for s in ['Open','On Hold','Closed'] %}
+          <option {% if vacancy and vacancy.status == s %}selected{% elif not vacancy and s == 'Open' %}selected{% endif %}>{{ s }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div><label>Target close (YYYY-MM-DD)</label><input class="input" type="date" name="target_close" value="{{ (vacancy.target_close.split('T')[0] if vacancy and vacancy.target_close else '') }}" /></div>
+    <div class="full"><label>Must-have skills (comma separated — used for JD matching)</label><input class="input" name="skills" value="{{ (vacancy.skills | join(', ')) if vacancy else '' }}" placeholder="e.g. Python, PostgreSQL, AWS, Kubernetes" /></div>
+    <div class="full">
+      <label>Job Description (used for CV ↔ JD matching)</label>
+      <textarea class="input" name="description" rows="10" placeholder="Paste the full JD here. Mention required years of experience (e.g. '5+ years'), tools, scope, and responsibilities — the matcher uses this text for keyword overlap and experience fit.">{{ vacancy.description if vacancy else '' }}</textarea>
+    </div>
+  </div>
+  <div class="row-flex" style="margin-top:14px;justify-content:flex-end">
+    <a class="btn" href="{{ url_for('vacancies_list') }}">Cancel</a>
+    <button class="btn primary" type="submit">{{ 'Save' if vacancy else 'Create' }}</button>
+  </div>
+</form>
+{% endblock %}

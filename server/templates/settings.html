@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+{% block title %}Settings{% endblock %}
+
+{% block content %}
+<div class="section-title"><h2>Settings &amp; Data</h2></div>
+
+<div class="card">
+  <h3 style="margin:0 0 10px">About this app</h3>
+  <p class="muted">
+    TalentTrack is a Flask + SQLite recruitment tracker. Candidate CVs are parsed on the server
+    via <code>pypdf</code> and a library of heuristics (skills, sections, date ranges).
+  </p>
+</div>
+
+<div class="card" style="margin-top:16px">
+  <h3 style="margin:0 0 10px">Pipeline stages</h3>
+  <ul>
+    <li>Sourced — candidate identified</li>
+    <li>Screening — recruiter call / resume review</li>
+    <li>Interview — technical / onsite loops</li>
+    <li>Offer — offer extended</li>
+    <li>Hired / Rejected — terminal</li>
+  </ul>
+</div>
+
+<div class="card" style="margin-top:16px">
+  <h3 style="margin:0 0 10px">Data export / import</h3>
+  <div class="row-flex">
+    <a class="btn" href="{{ url_for('export_json') }}">Export JSON</a>
+    <form method="post" action="{{ url_for('import_json') }}" enctype="multipart/form-data" style="display:contents">
+      <label class="btn" style="cursor:pointer">
+        Import JSON
+        <input type="file" accept=".json" name="file" style="display:none" onchange="this.form.submit()" />
+      </label>
+    </form>
+    <form method="post" action="{{ url_for('reset_data') }}" onsubmit="return confirm('Wipe ALL data?')" style="display:inline">
+      <button class="btn danger-ghost" type="submit">Reset all data</button>
+    </form>
+  </div>
+</div>
+{% endblock %}

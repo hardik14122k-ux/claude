@@ -1,0 +1,56 @@
+{% extends "base.html" %}
+{% from "_macros.html" import avatar %}
+{% block title %}Match candidates · {{ vacancy.title }}{% endblock %}
+
+{% block content %}
+<div class="section-title">
+  <h2>Match candidates → {{ vacancy.title }}</h2>
+  <a class="btn" href="{{ url_for('vacancies_list') }}">Back</a>
+</div>
+
+<div class="card" style="margin-bottom:14px">
+  <div class="row-flex" style="flex-wrap:wrap">
+    <span class="chip">{{ vacancy.department }}</span>
+    <span class="chip">{{ vacancy.location }}</span>
+    {% for s in vacancy.skills %}<span class="chip info">{{ s }}</span>{% endfor %}
+  </div>
+  {% if vacancy.description %}
+    <div class="muted" style="margin-top:8px;white-space:pre-wrap;font-size:12px">{{ vacancy.description }}</div>
+  {% endif %}
+</div>
+
+{% if results %}
+<div class="card" style="padding:0">
+  <table class="table">
+    <thead><tr><th>Candidate</th><th>Match</th><th>Skills</th><th>Keywords</th><th>Experience</th><th></th></tr></thead>
+    <tbody>
+      {% for r in results %}
+        <tr class="clickable" onclick="location.href='{{ url_for('candidate_detail', cid=r.candidate.id) }}'">
+          <td>
+            <div class="row-flex">
+              {{ avatar(r.candidate.name) }}
+              <div>
+                <div style="font-weight:600">{{ r.candidate.name }}</div>
+                <div class="muted" style="font-size:11px">{{ r.candidate.headline or '—' }}</div>
+              </div>
+            </div>
+          </td>
+          <td><span class="chip {% if r.match.total >= 70 %}ok{% elif r.match.total >= 40 %}warn{% else %}bad{% endif %}">{{ r.match.total }}%</span></td>
+          <td>{{ r.match.skill_match }}%</td>
+          <td>{{ r.match.keyword_match }}%</td>
+          <td>{{ r.match.experience_fit }}%</td>
+          <td onclick="event.stopPropagation()">
+            <form method="post" action="{{ url_for('candidate_link_vacancy', cid=r.candidate.id) }}">
+              <input type="hidden" name="vacancy_id" value="{{ vacancy.id }}" />
+              <button class="btn sm" type="submit">Link</button>
+            </form>
+          </td>
+        </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% else %}
+<div class="card empty">No candidates to match yet.</div>
+{% endif %}
+{% endblock %}
