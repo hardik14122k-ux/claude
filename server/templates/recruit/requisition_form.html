@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+{% block title %}New requisition{% endblock %}
+{% block content %}
+<h1>New requisition</h1>
+<form method="post" class="form-grid">
+  <label>Title * <input name="title" required></label>
+  <label>Department
+    <select name="department_id"><option value="">—</option>
+      {% for d in departments %}<option value="{{ d.id }}">{{ d.name }}</option>{% endfor %}
+    </select>
+  </label>
+  <label>Openings <input type="number" name="openings" value="1" min="1"></label>
+  <label>Employment type
+    <select name="employment_type">
+      <option value="permanent">Permanent</option>
+      <option value="contract">Contract</option>
+      <option value="intern">Intern</option>
+    </select>
+  </label>
+  <label>Target CTC min <input type="number" step="1000" name="target_ctc_min"></label>
+  <label>Target CTC max <input type="number" step="1000" name="target_ctc_max"></label>
+  <label class="span-2">Justification <textarea name="justification" rows="4"></textarea></label>
+  <button class="btn primary" type="submit">Submit</button>
+</form>
+{% endblock %}

@@ -1,0 +1,45 @@
+{% extends "base.html" %}
+{% block title %}Offers{% endblock %}
+{% block content %}
+<div class="page-head">
+  <h1>Offers</h1>
+  <a class="btn primary" href="{{ url_for('recruitment_ext.offer_new') }}">+ New offer</a>
+</div>
+
+<table class="data">
+  <thead><tr><th>Candidate</th><th>Position</th><th>CTC</th><th>Join date</th><th>Status</th><th></th></tr></thead>
+  <tbody>
+  {% for o in rows %}
+    <tr>
+      <td>{{ candidates.get(o.candidate_id, {}).get('name', '?') }}</td>
+      <td>{{ o.offered_position }}</td>
+      <td>₹{{ "{:,.0f}".format(o.offered_ctc) }}</td>
+      <td>{{ o.join_date or '—' }}</td>
+      <td><span class="pill pill-{{ o.status }}">{{ o.status }}</span></td>
+      <td>
+        {% if o.status == 'draft' %}
+          <form method="post" action="{{ url_for('recruitment_ext.offer_send', oid=o.id) }}" style="display:inline">
+            <button class="btn small primary" type="submit">Send</button>
+          </form>
+        {% elif o.status == 'sent' %}
+          <form method="post" action="{{ url_for('recruitment_ext.offer_decide', oid=o.id) }}" style="display:inline">
+            <input type="hidden" name="decision" value="accept">
+            <button class="btn small primary" type="submit">Mark accepted</button>
+          </form>
+          <form method="post" action="{{ url_for('recruitment_ext.offer_decide', oid=o.id) }}" style="display:inline">
+            <input type="hidden" name="decision" value="decline">
+            <button class="btn small" type="submit">Mark declined</button>
+          </form>
+        {% elif o.status == 'accepted' %}
+          <form method="post" action="{{ url_for('recruitment_ext.onboard', candidate_id=o.candidate_id) }}" style="display:inline">
+            <button class="btn small primary" type="submit">Onboard</button>
+          </form>
+        {% endif %}
+      </td>
+    </tr>
+  {% else %}
+    <tr><td colspan="6" class="muted">No offers</td></tr>
+  {% endfor %}
+  </tbody>
+</table>
+{% endblock %}

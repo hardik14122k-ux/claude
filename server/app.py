@@ -13,11 +13,36 @@ from flask import (
     session, url_for,
 )
 
-from . import analytics, cv_parser, db, matcher, seed
+from . import analytics, config, cv_parser, db, matcher, seed
+from .auth_routes import auth_bp
+from .compliance.routes import compliance_bp
+from .hrms import schema as hrms_db
+from .hrms.routes import hrms_bp
+from .payroll_ext.routes import payroll_bp
+from .recruitment.routes import recruitment_ext_bp
+from .shared import auth as shared_auth
 
 app = Flask(__name__)
-app.secret_key = "dev-secret-change-me"  # only used for flash + ephemeral upload tokens
-app.config["MAX_CONTENT_LENGTH"] = 10 * 1024 * 1024  # 10 MB CV uploads
+app.secret_key = config.SECRET_KEY
+app.config["MAX_CONTENT_LENGTH"] = config.MAX_UPLOAD_BYTES
+
+# Register all blueprints — recruitment routes below remain in this file unchanged.
+app.register_blueprint(auth_bp)
+app.register_blueprint(hrms_bp)
+app.register_blueprint(payroll_bp)
+app.register_blueprint(compliance_bp)
+app.register_blueprint(recruitment_ext_bp)
+
+
+@app.before_request
+def _load_user():
+    shared_auth.load_user_from_session()
+
+
+@app.context_processor
+def _inject_globals():
+    return {"current_user": shared_auth.current_user(),
+            "current_tenant": shared_auth.current_tenant()}
 
 # Ephemeral parsed-CV cache keyed by short tokens. Simple dict is fine for dev;
 # sessions would bloat for large CV text. Clears automatically on restart.
@@ -27,6 +52,24 @@ PARSED_CACHE: dict[str, dict] = {}
 @app.before_request
 def _ensure_db() -> None:
     db.init_db()
+    hrms_db.init_hrms_db()
+    _bootstrap_admin()
+
+
+def _bootstrap_admin() -> None:
+    """Create a default super_admin user if none exists in the default tenant."""
+    if hrms_db.get_user_by_email(config.DEFAULT_TENANT, "admin@example.com"):
+        return
+    # Only create if there are zero users at all (avoid race after manual users added).
+    if hrms_db.list_users(config.DEFAULT_TENANT):
+        return
+    hrms_db.create_user(
+        tenant_id=config.DEFAULT_TENANT,
+        email="admin@example.com",
+        password="admin",
+        name="Default Admin",
+        role="super_admin",
+    )
 
 
 def _csv(raw: str) -> list[str]:

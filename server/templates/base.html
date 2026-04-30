@@ -24,7 +24,30 @@
       <a class="nav-item {{ 'active' if route == 'pipeline' else '' }}" href="{{ url_for('pipeline') }}">Pipeline</a>
       <a class="nav-item {{ 'active' if route.startswith('interview') else '' }}" href="{{ url_for('interviews_list') }}">Interviews</a>
       <a class="nav-item {{ 'active' if route == 'reports' else '' }}" href="{{ url_for('reports') }}">Reports</a>
+      <a class="nav-item nav-section">HRMS</a>
+      <a class="nav-item {{ 'active' if route.startswith('hrms.employees') else '' }}" href="{{ url_for('hrms.employees_list') }}">Employees</a>
+      <a class="nav-item {{ 'active' if route == 'hrms.org' else '' }}" href="{{ url_for('hrms.org') }}">Org structure</a>
+      <a class="nav-item {{ 'active' if route.startswith('hrms.attendance') else '' }}" href="{{ url_for('hrms.attendance_view') }}">Attendance</a>
+      <a class="nav-item {{ 'active' if route.startswith('hrms.leave') else '' }}" href="{{ url_for('hrms.leave_view') }}">Leave</a>
+      <a class="nav-item {{ 'active' if route == 'hrms.me' else '' }}" href="{{ url_for('hrms.me') }}">Self-service</a>
+      <a class="nav-item nav-section">Payroll</a>
+      <a class="nav-item {{ 'active' if route.startswith('payroll.structures') else '' }}" href="{{ url_for('payroll.structures_list') }}">Salary structures</a>
+      <a class="nav-item {{ 'active' if route.startswith('payroll.runs') else '' }}" href="{{ url_for('payroll.runs_list') }}">Payroll runs</a>
+      <a class="nav-item {{ 'active' if route == 'payroll.reimbursements_view' else '' }}" href="{{ url_for('payroll.reimbursements_view') }}">Reimbursements</a>
+      <a class="nav-item {{ 'active' if route == 'payroll.locations_view' else '' }}" href="{{ url_for('payroll.locations_view') }}">Locations</a>
+      <a class="nav-item nav-section">Recruit ext</a>
+      <a class="nav-item {{ 'active' if route.startswith('recruitment_ext.requisition') else '' }}" href="{{ url_for('recruitment_ext.requisitions_list') }}">Requisitions</a>
+      <a class="nav-item {{ 'active' if route.startswith('recruitment_ext.offer') else '' }}" href="{{ url_for('recruitment_ext.offers_list') }}">Offers</a>
+      <a class="nav-item nav-section">Compliance</a>
+      <a class="nav-item {{ 'active' if route == 'compliance.dashboard' else '' }}" href="{{ url_for('compliance.dashboard') }}">Compliance</a>
+      <a class="nav-item {{ 'active' if route == 'hrms.audit_log' else '' }}" href="{{ url_for('hrms.audit_log') }}">Audit log</a>
+      <a class="nav-item nav-section">System</a>
       <a class="nav-item {{ 'active' if route == 'settings' else '' }}" href="{{ url_for('settings_page') }}">Settings</a>
+      {% if current_user %}
+        <a class="nav-item" href="{{ url_for('auth.logout') }}">Sign out ({{ current_user.email }})</a>
+      {% else %}
+        <a class="nav-item" href="{{ url_for('auth.login') }}">Sign in</a>
+      {% endif %}
     </nav>
     <div class="sidebar-footer">
       <form method="post" action="{{ url_for('seed_data') }}" style="display:contents">

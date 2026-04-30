@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+{% block title %}New offer{% endblock %}
+{% block content %}
+<h1>Draft offer</h1>
+<form method="post" class="form-grid">
+  <label>Candidate *
+    <select name="candidate_id" required>
+      {% for c in candidates %}<option value="{{ c.id }}">{{ c.name }} — {{ c.email }}</option>{% endfor %}
+    </select>
+  </label>
+  <label>Vacancy
+    <select name="vacancy_id"><option value="">—</option>
+      {% for v in vacancies %}<option value="{{ v.id }}">{{ v.title }}</option>{% endfor %}
+    </select>
+  </label>
+  <label>Offered CTC * <input type="number" step="1000" name="offered_ctc" required></label>
+  <label>Position title <input name="offered_position"></label>
+  <label>Join date <input type="date" name="join_date"></label>
+  <label>Expiry date <input type="date" name="expiry_date"></label>
+  <label class="span-2">Notes <textarea name="notes" rows="3"></textarea></label>
+  <button class="btn primary" type="submit">Save draft</button>
+</form>
+{% endblock %}

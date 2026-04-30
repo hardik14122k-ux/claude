@@ -1,0 +1,87 @@
+{% extends "base.html" %}
+{% block title %}{{ employee.first_name }} {{ employee.last_name }}{% endblock %}
+{% block content %}
+<div class="page-head">
+  <h1>{{ employee.first_name }} {{ employee.last_name }} <span class="muted">{{ employee.employee_code }}</span></h1>
+  <div>
+    <a class="btn" href="{{ url_for('hrms.employee_edit', eid=employee.id) }}">Edit</a>
+    <a class="btn" href="{{ url_for('payroll.structure_edit', eid=employee.id) }}">Salary</a>
+    <a class="btn" href="{{ url_for('payroll.yearend_view', eid=employee.id) }}">Year-end</a>
+  </div>
+</div>
+
+<div class="grid two">
+  <div class="card">
+    <h3>Profile</h3>
+    <dl class="kv">
+      <dt>Email</dt><dd>{{ employee.email or '—' }}</dd>
+      <dt>Phone</dt><dd>{{ employee.phone or '—' }}</dd>
+      <dt>Joined</dt><dd>{{ employee.date_joined or '—' }}</dd>
+      <dt>Status</dt><dd><span class="pill pill-{{ employee.status }}">{{ employee.status }}</span></dd>
+      <dt>Type</dt><dd>{{ employee.employment_type }}</dd>
+      <dt>Manager</dt><dd>{{ employee.manager_id or '—' }}</dd>
+      <dt>PAN</dt><dd>{{ employee.pan or '—' }}</dd>
+      <dt>UAN</dt><dd>{{ employee.uan or '—' }}</dd>
+      <dt>Bank</dt><dd>{{ employee.bank_name or '—' }} {{ employee.bank_ifsc or '' }}</dd>
+    </dl>
+  </div>
+  <div class="card">
+    <h3>Leave balances</h3>
+    <table class="data">
+      <thead><tr><th>Type</th><th>Available</th><th>Used</th></tr></thead>
+      <tbody>
+      {% for b in balances %}
+        <tr>
+          <td>{{ b.leave_code }}</td>
+          <td>{{ "%.1f"|format(b.available) }}</td>
+          <td>{{ "%.1f"|format(b.used or 0) }}</td>
+        </tr>
+      {% else %}
+        <tr><td colspan="3" class="muted">No balances yet — admin can seed leave types from /hr/leave</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<div class="card">
+  <h3>Documents</h3>
+  <form method="post" enctype="multipart/form-data" action="{{ url_for('hrms.upload_document', eid=employee.id) }}" class="form-grid">
+    <input type="file" name="file" required>
+    <input name="category" placeholder="category (PAN, Aadhaar, offer_letter...)">
+    <input name="title" placeholder="title">
+    <label class="inline"><input type="checkbox" name="confidential"> Confidential</label>
+    <button class="btn primary" type="submit">Upload</button>
+  </form>
+  <table class="data">
+    <thead><tr><th>Name</th><th>Category</th><th>Size</th><th>Uploaded</th><th></th></tr></thead>
+    <tbody>
+    {% for d in documents %}
+      <tr>
+        <td>{{ d.title or d.file_name }}</td>
+        <td>{{ d.category or '—' }}</td>
+        <td>{{ d.size_bytes }}</td>
+        <td>{{ d.created_at }}</td>
+        <td><a class="btn small" href="{{ url_for('hrms.download_document', doc_id=d.id) }}">Download</a></td>
+      </tr>
+    {% else %}
+      <tr><td colspan="5" class="muted">No documents</td></tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+<div class="card">
+  <h3>Audit trail</h3>
+  <table class="data">
+    <thead><tr><th>Action</th><th>By</th><th>Message</th><th>When</th></tr></thead>
+    <tbody>
+    {% for a in audit %}
+      <tr><td>{{ a.action }}</td><td>{{ a.actor_id }}</td><td>{{ a.message }}</td><td>{{ a.ts }}</td></tr>
+    {% else %}
+      <tr><td colspan="4" class="muted">No audit entries yet</td></tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}
