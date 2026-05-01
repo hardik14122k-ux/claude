@@ -208,3 +208,17 @@ label { font-size: 12px; color: var(--muted); display: block; margin-bottom: 6px
 .spacer { flex: 1; }
 
 .empty { text-align: center; padding: 40px; color: var(--muted); }
+
+/* ===== Skeleton loading state (for async views) ===== */
+.skeleton .sk-line {
+  height: 10px;
+  border-radius: 6px;
+  background: linear-gradient(90deg, var(--panel-2), var(--panel), var(--panel-2));
+  background-size: 200% 100%;
+  animation: skShimmer 1.2s linear infinite;
+}
+.skeleton .sk-line.big { height: 22px; }
+@keyframes skShimmer {
+  0%   { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}

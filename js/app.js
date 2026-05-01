@@ -1,12 +1,12 @@
-// Router + global event wiring.
+// Router + global event wiring (Supabase-backed).
 
-import { subscribe, resetAll } from './store.js';
-import { seedDemoData } from './seed.js';
+import { subscribe, refreshAll } from './store.js';
+import { seedDemoData, resetAllData } from './seed.js';
 import { toast } from './ui.js';
 
 import { Dashboard } from './views/dashboard.js';
 import { Vacancies, openVacancyForm } from './views/vacancies.js';
-import { Candidates, openUploadDialog, openCandidate } from './views/candidates.js';
+import { Candidates, openUploadDialog } from './views/candidates.js';
 import { Pipeline } from './views/pipeline.js';
 import { Interviews } from './views/interviews.js';
 import { Reports } from './views/reports.js';
@@ -51,28 +51,28 @@ document.getElementById('nav').addEventListener('click', e => {
 
 window.addEventListener('hashchange', () => navigate((location.hash || '#dashboard').slice(1)));
 
-document.getElementById('quick-upload').addEventListener('click', () => openUploadDialog(() => {
-  if (currentRoute === 'candidates' || currentRoute === 'pipeline' || currentRoute === 'dashboard') render();
-}));
-
+document.getElementById('quick-upload').addEventListener('click', () => openUploadDialog(() => render()));
 document.getElementById('quick-vacancy').addEventListener('click', () => openVacancyForm());
 
-document.getElementById('seed-btn').addEventListener('click', () => {
-  const added = seedDemoData();
-  if (added) { toast('Demo data loaded', 'ok'); render(); }
-  else toast('Already have data — reset first', 'bad');
+document.getElementById('seed-btn').addEventListener('click', async () => {
+  try {
+    const added = await seedDemoData();
+    if (added) { toast('Demo data loaded', 'ok'); await refreshAll(); render(); }
+    else toast('Already have data — reset first', 'bad');
+  } catch (err) { toast('Seed failed: ' + err.message, 'bad'); }
 });
 
-document.getElementById('reset-btn').addEventListener('click', () => {
-  if (confirm('Reset ALL data? This cannot be undone.')) { resetAll(); toast('Reset', 'ok'); render(); }
+document.getElementById('reset-btn').addEventListener('click', async () => {
+  if (!confirm('Reset ALL data? This cannot be undone.')) return;
+  try { await resetAllData(); toast('Reset', 'ok'); await refreshAll(); render(); }
+  catch (err) { toast('Reset failed: ' + err.message, 'bad'); }
 });
 
-// Global search: jumps to candidates view with filter, or opens a candidate directly on Enter.
+// Global search jumps to candidates view with the term applied.
 const search = document.getElementById('globalSearch');
 search.addEventListener('keydown', e => {
   if (e.key === 'Enter' && search.value.trim()) {
     navigate('candidates');
-    // Populate the in-view search using a microtask — simple approach:
     setTimeout(() => {
       const inViewSearch = viewEl.querySelector('input[placeholder^="Search by name"]');
       if (inViewSearch) {
@@ -83,13 +83,8 @@ search.addEventListener('keydown', e => {
   }
 });
 
-// Reactive re-render on any state change (cheap for this scale).
-subscribe(() => render());
+// Re-render on any cache change (cheap at this scale).
+subscribe('*', () => render());
 
 // Initial route from hash.
 navigate((location.hash || '#dashboard').slice(1));
-
-// Nudge the user to load demo data on first run.
-if (!localStorage.getItem('talenttrack.v1')) {
-  setTimeout(() => toast('Tip: click "Load demo data" in the sidebar to explore.', ''), 400);
-}
