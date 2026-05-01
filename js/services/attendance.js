@@ -8,11 +8,28 @@ import { validateAttendance } from '../lib/validators.js';
 
 const TABLE = 'attendance';
 
-export async function markAttendance({ employeeId, date, status = 'present', checkIn = null, checkOut = null, notes = null }) {
+const FULL_DAY_HOURS = 8;
+const HALF_DAY_HOURS = 4;
+const MANUAL_STATUSES = new Set(['leave', 'holiday', 'weekend']);
+
+// Auto-derive Present/Half-day/Absent from check_in/check_out.
+// Manual statuses (leave/holiday/weekend) win over the derivation.
+export function deriveStatus({ status, checkIn, checkOut }) {
+  if (status && MANUAL_STATUSES.has(status)) return status;
+  if (!checkIn) return 'absent';
+  if (!checkOut) return 'present'; // checked in but not yet out
+  const hrs = (new Date(checkOut) - new Date(checkIn)) / 3_600_000;
+  if (hrs >= FULL_DAY_HOURS) return 'present';
+  if (hrs >= HALF_DAY_HOURS) return 'half_day';
+  return 'half_day';
+}
+
+export async function markAttendance({ employeeId, date, status, checkIn = null, checkOut = null, notes = null }) {
+  const finalStatus = deriveStatus({ status, checkIn, checkOut });
   const payload = objToRow({
     employeeId,
     attendanceDate: date,
-    status,
+    status: finalStatus,
     checkIn: checkIn || null,
     checkOut: checkOut || null,
     notes,
