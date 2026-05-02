@@ -39,4 +39,4 @@ Click **Load demo data** in the sidebar to populate sample vacancies, candidates
 
 The parser handles the common resume layout conventions: it finds email/phone via regex, guesses the candidate's name from the first few lines with capitalisation heuristics, splits sections on known headers (Summary / Skills / Experience / Education), matches skills against a 100+ term library, parses date ranges (`Jan 2019 – Present`, `2020-2023`) to estimate years of experience, and uses a fallback explicit-match like `"5+ years of experience"`.
 
-You always see a preview and can correct anything before saving.
+You always see a preview and can correct anything before  saving.
