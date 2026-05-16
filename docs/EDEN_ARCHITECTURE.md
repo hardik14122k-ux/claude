@@ -1,10 +1,10 @@
-# EDEN — System Architecture (Initial Draft v0.1)
+# EDEN — System Architecture (Draft v0.3)
 
 > **EDEN** — *"Your one-stop garden for everything HR."*
 > A multi-party HR-services SaaS: a consultancy operates it, client companies
 > consume it, and external referral partners feed talent acquisition into it.
 >
-> Status: **DRAFT v0.2 — core decisions locked (see §0.1), refining.**
+> Status: **DRAFT v0.3 — all P0 decisions locked (§0.1); ready to build.**
 > Nothing here is implemented yet — this is the blueprint we converge on
 > *before* writing code.
 
@@ -20,6 +20,10 @@
 | 4 | Partner depth | **Full transparency + can refer candidates** | Partner is a bridge/mediator: complete read visibility over the *entire recruitment process* for referred clients, may submit candidate referrals, sees own commissions — but performs none of the recruitment work (consultancy does). |
 | 5 | Backend stack | **Python / FastAPI** (Postgres, typed, async) | Greenfield service in FastAPI; HR-domain math ported as pure Python libraries. PDP via OPA/Cedar sidecar or in-process policy lib (TBD §13). |
 | 6 | Partner referral flow | **Consultancy review queue** (not direct-to-pipeline) | Partner-submitted candidates land in a consultancy triage queue; a consultancy recruiter accepts/rejects before the candidate enters the client pipeline. Consultancy stays in control of the work. |
+| 7 | PDP form factor | **In-process Python policy engine, swappable interface** | Policy decisions evaluated in the FastAPI process (no network hop). Engine sits behind a `PolicyDecisionPoint` interface so an OPA/Cedar sidecar can replace it later without touching call sites. |
+| 8 | Auth provider | **Self-hosted Keycloak** | Owns OIDC + MFA + SCIM + (enterprise) SAML federation. No per-seat licensing; realm/client model maps cleanly to the multi-party tenancy. We operate it (HA, upgrades, backups). |
+| 9 | Hosting / residency | **India region only (DPDP-aligned)** | Single-region deploy for P0: simpler ops, clean data-residency story. Multi-region deferred; schema-per-client already makes a future region split a routing change. |
+| 10 | DB connection strategy | **One pooled role + per-request `search_path`** | Single app DB role; tenant router sets `search_path` per request and `DISCARD ALL` on return. Cheap, scales to thousands of client schemas. Per-client DB roles deferred. |
 
 ---
 
@@ -336,17 +340,19 @@ math is ported in as pure libraries (no DB assumptions).
         │                       │                             │
  ┌──────▼──────┐  ┌────────▼─────────┐  ┌──────▼──────┐  ┌────────────────┐
  │ Identity    │  │ Authorization PDP│  │ Tenant      │  │ Domain Modules │
- │ (OIDC, MFA, │  │ (policy eval,    │  │ Router +    │  │ Recruitment    │
- │  SCIM, SAML │◀▶│  effective-      │◀▶│ Schema      │◀▶│ Core HR        │
- │  for entpr.)│  │  access, SoD,    │  │ Provisioner │  │ Time & Attend. │
- └─────────────┘  │  break-glass)    │  │ (search_path│  │ Leave          │
-                  └──────────────────┘  │  per req.)  │  │ Payroll        │
-                                         └─────────────┘  │ Compliance     │
- ┌──────────────────────────────┐  ┌───────────┐         │ Documents      │
- │ Postgres cluster             │  │ Object    │         │ Billing        │
- │  eden_control (shared)       │  │ Store     │         │ Notifications  │
- │  client_<uuid> × N (per      │  │ (per-     │         │ Analytics (DW) │
- │   client; encrypted, PITR)   │  │  client   │         └────────────────┘
+ │ Keycloak    │  │ in-process Py,   │  │ Router +    │  │ Recruitment    │
+ │ (self-host: │◀▶│ swappable iface  │◀▶│ Schema      │◀▶│ Core HR        │
+ │ OIDC/MFA/   │  │ (policy eval,    │  │ Provisioner │  │ Time & Attend. │
+ │ SCIM/SAML)  │  │  effective-      │  │ (1 pooled   │  │ Leave          │
+ └─────────────┘  │  access, SoD,    │  │  role,      │  │ Payroll        │
+                  │  break-glass)    │  │  search_path│  │ Compliance     │
+                  └──────────────────┘  │  per req.)  │  │ Documents      │
+                                         └─────────────┘  │ Billing        │
+ ┌──────────────────────────────┐  ┌───────────┐         │ Notifications  │
+ │ Postgres cluster             │  │ Object    │         │ Analytics (DW) │
+ │  eden_control (shared)       │  │ Store     │         └────────────────┘
+ │  client_<uuid> × N (per      │  │ (per-     │
+ │   client; encrypted, PITR)   │  │  client   │
  │  migration runner + versions │  │  prefix)  │
  └──────────────────────────────┘  └───────────┘
         ▲                                                   │
@@ -819,21 +825,36 @@ should be.
 
 ---
 
-## 13. Next-round questions (to lock before P0 build)
+## 13. Status: all P0 decisions locked
 
-Core forks + stack + referral flow are locked (§0.1). Three refinements
-remain before P0 build:
+Every architectural fork (§0.1, decisions 1–10) is now decided. There are
+no open blocking questions for P0.
 
-1. **PDP form factor.** With FastAPI: an **OPA/Cedar sidecar**
-   (language-agnostic policy, network hop) or an **in-process Python
-   policy engine** (simpler ops, no hop)? Recommended: in-process for P0,
-   keep the policy interface swappable.
-2. **Auth provider.** Build on a managed identity provider
-   (Auth0/Clerk/AWS Cognito) for OIDC+MFA+SCIM, or self-host
-   (Keycloak)? Affects P0 speed vs control.
-3. **Connection strategy for schema-per-client.** Recommended: one pooled
-   role + `SET search_path` per request (cheap, scales to thousands of
-   clients). Confirm acceptable, vs per-client DB roles (stronger DB-level
-   isolation, heavier ops)?
-4. **Hosting/residency.** India region only (DPDP-aligned), or
-   multi-region from day one?
+**P0 build can start. Locked stack for P0:**
+
+- **Backend:** Python / FastAPI (async), Postgres.
+- **Identity:** self-hosted Keycloak — one realm; clients map to Keycloak
+  groups/orgs; OIDC + MFA + SCIM; SAML reserved for enterprise clients.
+- **Authorization:** in-process Python PDP behind a `PolicyDecisionPoint`
+  interface (OPA/Cedar swap-in deferred).
+- **Tenancy:** `eden_control` shared schema + `client_<uuid>` per client;
+  one pooled DB role; tenant router sets `search_path` per request and
+  `DISCARD ALL` on release.
+- **Deploy:** single India region (DPDP-aligned); multi-region deferred.
+
+**Deferred (revisit at P5 / on demand, not before):** OPA/Cedar sidecar,
+managed IdP migration, per-client DB roles, multi-region/residency,
+white-label enablement.
+
+**Recommended P0 exit criteria (definition of done):**
+
+1. Keycloak issues a token; FastAPI validates it and resolves principal +
+   active client from the verified token only.
+2. Provisioning a client creates `client_<uuid>`, runs the tenant
+   migration template, records `tenant_schemas` / `tenant_schema_versions`.
+3. Tenant router sets `search_path` per request; a cross-client read
+   returns nothing (proven by test); connection is reset on release.
+4. The `PolicyDecisionPoint` interface exists with the in-process engine
+   wired in; one guarded endpoint demonstrates allow/deny.
+5. Migration runner applies a new tenant migration to every client schema
+   transactionally, with per-schema version tracking and retry.
