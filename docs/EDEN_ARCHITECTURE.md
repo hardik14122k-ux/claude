@@ -4,9 +4,20 @@
 > A multi-party HR-services SaaS: a consultancy operates it, client companies
 > consume it, and external referral partners feed talent acquisition into it.
 >
-> Status: **DRAFT FOR REVIEW.** Decision points are flagged `⟦DECISION⟧`.
+> Status: **DRAFT v0.2 — core decisions locked (see §0.1), refining.**
 > Nothing here is implemented yet — this is the blueprint we converge on
 > *before* writing code.
+
+---
+
+## 0.1 Locked decisions (from review)
+
+| # | Decision | Chosen | Architectural consequence |
+|---|----------|--------|---------------------------|
+| 1 | Operator model | **Single consultancy now, designed for white-label** | Keep `consultancies` node in the control plane; one row today, multi-row ready. No white-label UI/billing yet. |
+| 2 | Data isolation | **Dedicated Postgres schema per client (bridge model)** | Physical isolation. Control-plane schema (shared) + one tenant schema per client. Tenant router + schema provisioner required. |
+| 3 | Build approach | **Greenfield**, reuse only the validated HR-domain logic | New codebase on this architecture; port payroll/attendance/leave/compliance math as libraries. |
+| 4 | Partner depth | **Full transparency + can refer candidates** | Partner is a bridge/mediator: complete read visibility over the *entire recruitment process* for referred clients, may submit candidate referrals, sees own commissions — but performs none of the recruitment work (consultancy does). |
 
 ---
 
@@ -200,52 +211,118 @@ the subject (e.g. Aadhaar shown as `XXXX-XXXX-1234`) and access is logged.
 | **Client HR (scoped)** | `CLIENT_HR` | `legal_entity` / `department` | `{core_hr, leave, attendance}` | L2 | legal_entity/dept | none |
 | **Client Manager** | `MANAGER_SELF_TEAM` | `team` | `{attendance, leave, performance}` | L1 | team | none |
 | **Client Employee (ESS)** | `EMPLOYEE_SELF` | `self` | `{core_hr, leave, attendance, payroll(self)}` | L1 (+ own L3) | self | none |
-| **Recruitment Partner** | `PARTNER_TA_VIEWER` | `referred` | `{recruitment}` (read + limited) | L1 (no comp; PII masked; **no export**) | referred clients only | referral window |
+| **Recruitment Partner** | `PARTNER_BRIDGE` | `referred` | `{recruitment}` full read **+ candidate referral create** | L2 (full funnel incl. interview feedback & offer status; L4 candidate PII masked; **no export**) | referred clients only | referral window |
 | **Auditor** | `AUDITOR_RO` | `consultancy`/`client` | all (read) | L4 (read, masked logging) | all | campaign window |
 
-> **Partner specifics** (you flagged this as important): a partner sees, for
-> *clients they referred only*: vacancy list, pipeline stage counts,
-> candidate names + status (no resumes, no contact PII, no salary, **no
-> export/download**), and **their own commission/billing** line. Access
-> auto-expires at the end of the referral window or on client off-boarding.
-> Everything they see is logged and visible to the Consultancy Owner.
+> **Partner specifics (revised — bridge/mediator model):** the partner's job
+> is to *bring the client and act as the bridge*; the consultancy does all the
+> recruitment work. So for *clients they referred only*, a partner gets:
+>
+> - **Complete transparency over the whole recruitment process**: every
+>   vacancy, every candidate, full pipeline with stage history, interview
+>   schedules **and feedback**, offer status and outcomes. Not just counts —
+>   the real picture, so they can mediate confidently with the client.
+> - **Candidate referral**: may *submit* candidates (creates a candidate with
+>   `source = partner_referral`, tagged to the partner for attribution). They
+>   do **not** move stages, schedule interviews, or give hiring decisions —
+>   that stays with the consultancy.
+> - **Their own commission/billing** line and placement outcomes.
+> - **Restrictions**: candidate L4 PII (Aadhaar/PAN) masked; **no bulk
+>   export/download** of the candidate database; scope strictly
+>   `recruitment` module only — zero visibility into the client's core HR,
+>   attendance, payroll, or other employees.
+> - Access auto-expires at the end of the referral window or on client
+>   off-boarding. Every partner view and referral is logged and visible to
+>   the Consultancy Owner.
 
 ---
 
-## 5. Multi-tenancy & isolation strategy
+## 5. Multi-tenancy & isolation strategy — schema-per-client (LOCKED)
 
-⟦DECISION⟧ **Default = Pooled Postgres + Row-Level Security**, with a
-**promotion path to dedicated schema/DB** for enterprise clients that
-demand physical isolation or specific data residency.
+**Model: bridge / schema-per-tenant.** One Postgres cluster. A shared
+**control-plane schema** holds identity, tenancy, authorization, audit and
+billing. **Each client company gets its own dedicated schema**
+(`client_<uuid>`) holding *only that client's HR-domain data*. Cross-tenant
+isolation is therefore **physical at the schema boundary**, not a
+row-filter that a bug could bypass.
 
-**Why pooled-RLS as default:** cheapest per tenant, supports the
-consultancy's cross-client workflows, matches the prototype's Supabase
-direction. **Why a silo option:** some enterprise clients (and certain
-data-residency contracts) will require it; build the abstraction now so
-promotion is config, not a rewrite.
+```
+Postgres cluster
+├── eden_control                ← shared control plane (one)
+│     identity, tenancy graph, roles, role_assignments,
+│     audit_log, consent, billing, partner commissions
+├── client_a1b2…  (Acme)        ← one schema per client
+│     employees, candidates, vacancies, interviews,
+│     attendance, leave_*, payroll, documents …
+├── client_c3d4…  (Globex)
+└── client_…       (per client, provisioned on onboarding)
+```
 
-**Defense in depth (all three, always):**
+### 5.1 Why this matches the decisions
 
-1. **API policy engine (PDP)** — central allow/deny before any handler runs.
-2. **Database RLS** — every domain table has policies keyed off
-   session GUCs (`eden.principal`, `eden.active_client`,
-   `eden.clearance`, `eden.record_scope`) set per request from the
-   *validated* token. Consultancy/partner reach is enforced by RLS joining
-   to `consultancy_client_assignment` / `referrals`.
-3. **Field masking** — serialization layer redacts fields above the
+- **Strong isolation** the consultancy can promise clients contractually
+  ("your data lives in its own schema, never co-mingled").
+- A query mistake in the app **cannot** return another client's rows —
+  the other client's tables are not even on the `search_path`.
+- Per-client **backup, restore, export, and erasure** become a
+  schema-level operation (clean DPDP "right to erasure" / off-boarding).
+- White-label-ready: a future second consultancy is just more rows in
+  `eden_control.consultancies`; client schemas are unaffected.
+
+### 5.2 Tenant routing (how a request reaches the right schema)
+
+1. Request authenticated → principal + **active client** resolved from the
+   validated token / tenant switcher (never from the request body).
+2. PDP authorizes the action against `eden_control`.
+3. The DB connection (from a per-request pooled connection) executes:
+   `SET search_path = client_<active_client>, eden_shared_ext;`
+   plus session GUCs (`eden.principal`, `eden.clearance`,
+   `eden.record_scope`, `eden.scope_dept`).
+4. All domain queries now run **inside that client's schema only**.
+5. Connection is reset (`DISCARD ALL` / `RESET search_path`) before
+   returning to the pool — no leakage between requests.
+
+> Consultancy members and partners work across many clients by **switching
+> active client** (one schema at a time). The control plane records *which*
+> clients they may switch to (`consultancy_client_assignment`,
+> `referrals`); the router refuses a `search_path` to a schema the
+> principal is not authorized for.
+
+### 5.3 Schema provisioning & migrations
+
+- **Onboarding a client** = create `client_<uuid>`, run the **tenant
+  migration template** (versioned DDL) to build the HR-domain tables, seed
+  defaults (leave types, holidays).
+- A **migration runner** applies new tenant migrations to *every* client
+  schema transactionally, tracked per-schema in
+  `eden_control.tenant_schema_versions` (so a failed client is retried, not
+  silently skipped).
+- Enterprise clients needing a separate **database/region** later: the
+  schema abstraction makes that a connection-routing change, not a rewrite.
+
+### 5.4 Defense in depth (still all layers)
+
+1. **API policy engine (PDP)** — central allow/deny before any handler.
+2. **Schema isolation** — physical; the primary cross-tenant boundary.
+3. **Intra-schema RLS** — *within* a client schema, RLS still enforces
+   **record-scope** (department / team / self) and the **partner
+   recruitment-only** restriction, keyed off session GUCs.
+4. **Field masking** — serialization layer redacts fields above the
    caller's clearance even if a query over-selects.
 
-A failure in any one layer must not leak data across tenants. The tenant
-key is never taken from the request body — only from the verified token /
-session context.
+The tenant identity is never taken from the request body — only from the
+verified token. A failure in any one layer must not cross a client
+boundary.
 
 ---
 
 ## 6. System architecture (services & data)
 
-⟦DECISION⟧ **Start as a modular monolith** (clear module boundaries, one
-deployable, one Postgres) and extract services only when scale demands.
-Premature microservices would kill velocity at your stage.
+**Start as a modular monolith** (clear module boundaries, one deployable,
+one Postgres cluster, schema-per-client) and extract services only when
+scale demands. Premature microservices would kill velocity at your stage.
+**Greenfield codebase**; the validated payroll/attendance/leave/compliance
+math is ported in as pure libraries (no DB assumptions).
 
 ```
                 ┌────────────────────────────────────────────┐
@@ -255,20 +332,21 @@ Premature microservices would kill velocity at your stage.
                                 │
         ┌───────────────────────┼────────────────────────────┐
         │                       │                             │
- ┌──────▼──────┐      ┌─────────▼──────────┐        ┌─────────▼─────────┐
- │ Identity    │      │ Authorization PDP  │        │ Domain Modules    │
- │ (OIDC,      │      │ (policy eval,      │        │ Recruitment       │
- │  MFA, SCIM, │◀────▶│  effective-access, │◀──────▶│ Core HR           │
- │  SAML for   │      │  emits RLS GUCs,   │        │ Time & Attendance │
- │  enterprise)│      │  SoD, break-glass) │        │ Leave             │
- └─────────────┘      └────────────────────┘        │ Payroll           │
-                                                    │ Compliance        │
- ┌─────────────┐   ┌──────────────┐   ┌───────────┐ │ Documents         │
- │ Postgres    │   │ Object Store │   │ Search    │ │ Billing (clients  │
- │ (RLS,       │   │ (S3-compat,  │   │ (OpenSrch)│ │  + partner comm.) │
- │  encrypted, │   │  per-tenant  │   └───────────┘ │ Notifications     │
- │  PITR)      │   │  prefix, KMS)│                  │ Analytics (sep DW)│
- └─────────────┘   └──────────────┘                  └───────────────────┘
+ ┌──────▼──────┐  ┌────────▼─────────┐  ┌──────▼──────┐  ┌────────────────┐
+ │ Identity    │  │ Authorization PDP│  │ Tenant      │  │ Domain Modules │
+ │ (OIDC, MFA, │  │ (policy eval,    │  │ Router +    │  │ Recruitment    │
+ │  SCIM, SAML │◀▶│  effective-      │◀▶│ Schema      │◀▶│ Core HR        │
+ │  for entpr.)│  │  access, SoD,    │  │ Provisioner │  │ Time & Attend. │
+ └─────────────┘  │  break-glass)    │  │ (search_path│  │ Leave          │
+                  └──────────────────┘  │  per req.)  │  │ Payroll        │
+                                         └─────────────┘  │ Compliance     │
+ ┌──────────────────────────────┐  ┌───────────┐         │ Documents      │
+ │ Postgres cluster             │  │ Object    │         │ Billing        │
+ │  eden_control (shared)       │  │ Store     │         │ Notifications  │
+ │  client_<uuid> × N (per      │  │ (per-     │         │ Analytics (DW) │
+ │   client; encrypted, PITR)   │  │  client   │         └────────────────┘
+ │  migration runner + versions │  │  prefix)  │
+ └──────────────────────────────┘  └───────────┘
         ▲                                                   │
         │            ┌───────────────────────┐              │
         └────────────│ Event bus (outbox →   │◀─────────────┘
@@ -292,15 +370,18 @@ transactional and auditable.
 
 ---
 
-## 7. Database schema (draft DDL — identity, authz, audit, billing)
+## 7. Database schema (draft DDL)
 
-> HR-domain tables (candidates, vacancies, employees, attendance, leave,
-> payroll, …) are reused from the existing prototype schema, **with two
-> changes applied uniformly**: every row carries `client_company_id`
-> (tenant key) and, where statutory, `legal_entity_id`; and every table
-> gets the RLS policy template in §8.
+**Split by plane:**
 
-### 7.1 Identity & tenancy
+- **`eden_control` (shared, §7.1–7.4):** identity, tenancy graph,
+  authorization, audit, billing. One copy. Never holds HR-domain rows.
+- **`client_<uuid>` tenant schema (§7.5):** the HR-domain tables, ported
+  from the validated prototype. **No `client_company_id` column needed** —
+  the *schema itself* is the tenant boundary. `legal_entity_id` is still
+  carried where statutory boundaries matter (payroll, PF/ESI/TDS).
+
+### 7.1 Identity & tenancy  *(schema: `eden_control`)*
 
 ```sql
 create table consultancies (              -- ⟦DECISION⟧ 1 row, or many (white-label)
@@ -391,9 +472,23 @@ create table consultancy_client_assignment (
   status text not null default 'active',
   unique (principal_id, client_company_id)
 );
+
+-- Per-client schema bookkeeping (provisioning + migration tracking)
+create table tenant_schemas (
+  client_company_id uuid primary key references client_companies(id),
+  schema_name text unique not null,        -- 'client_<uuid>'
+  provisioned_at timestamptz,
+  status text not null default 'pending'   -- pending|ready|suspended|offboarded
+);
+create table tenant_schema_versions (
+  client_company_id uuid references client_companies(id),
+  migration_id text not null,              -- versioned tenant DDL applied
+  applied_at timestamptz default now(),
+  primary key (client_company_id, migration_id)
+);
 ```
 
-### 7.2 Authorization
+### 7.2 Authorization  *(schema: `eden_control`)*
 
 ```sql
 create table permissions (
@@ -492,7 +587,7 @@ create table access_reviews (                -- periodic recertification
 );
 ```
 
-### 7.3 Audit & compliance
+### 7.3 Audit & compliance  *(schema: `eden_control`)*
 
 ```sql
 create table audit_log (                     -- immutable, hash-chained
@@ -524,7 +619,7 @@ create table data_retention_policies (
 );
 ```
 
-### 7.4 Billing
+### 7.4 Billing  *(schema: `eden_control`)*
 
 ```sql
 create table client_subscriptions (
@@ -544,49 +639,97 @@ create table partner_commissions (
 );
 ```
 
+### 7.5 Tenant schema  *(schema: `client_<uuid>` — one per client)*
+
+Created by the provisioner on onboarding from a **versioned migration
+template**. Holds the HR domain ported from the validated prototype:
+
+```
+client_<uuid>.
+  -- Recruitment
+  vacancies, candidates, interviews, offers, requisitions,
+  candidate_referrals          (NEW: partner attribution; source=partner_referral)
+  -- Core HR
+  employees, org_assignments, documents
+  -- Time
+  attendance, attendance_regularizations
+  -- Leave
+  leave_types, leave_balances, leave_requests, holidays
+  -- Payroll (legal-entity scoped)
+  salary_structures, payroll_runs, payslips, arrears, reimbursements
+  -- Compliance
+  compliance_findings, statutory_reminders
+  -- local activity feed (tenant-visible); security audit stays in eden_control
+  activity_log
+```
+
+Differences vs the prototype tables:
+
+- **Drop `company_id`/`tenant_id` columns** — the schema *is* the tenant.
+- Keep `legal_entity_id` on payroll/statutory tables (registration
+  boundary within a client).
+- Every table gets the intra-schema RLS in §8 for record-scope + partner
+  restriction.
+- `candidate_referrals` is new: `(candidate_id, partner_id, referred_at,
+  status)` so partner-sourced candidates are attributed for commissions
+  and the partner can see only their pipeline.
+
 ---
 
-## 8. RLS policy template (applied to every domain table)
+## 8. Intra-schema RLS template
+
+Cross-tenant isolation is **already physical** (the request runs inside one
+`client_<uuid>` schema — other clients' tables aren't reachable). So RLS
+here does **not** re-check the tenant. It enforces, *within* the active
+client schema:
+
+1. **Record scope** — `all` / `legal_entity` / `department` / `team` / `self`
+2. **Partner restriction** — partners see only recruitment tables, only
+   their referred-and-attributed pipeline, never other employees' data
 
 ```sql
--- Session GUCs set by the API from the *validated* token, never the body:
---   eden.principal        uuid
---   eden.active_client    uuid
---   eden.clearance        int
---   eden.record_scope     text
---   eden.scope_dept       uuid (nullable)
+-- Session GUCs set per request by the Tenant Router from the *validated*
+-- token (never the request body), after SET search_path = client_<uuid>:
+--   eden.principal     uuid
+--   eden.party_kind    text   -- consultancy|client|partner|auditor
+--   eden.clearance     int
+--   eden.record_scope  text   -- all|legal_entity|department|team|self
+--   eden.scope_dept    uuid   (nullable)
+--   eden.scope_emp     uuid   (nullable; the principal's own employee row)
 
 alter table <domain_table> enable row level security;
 
-create policy tenant_isolation on <domain_table>
+-- (a) Record-scope policy (applies to non-partner principals)
+create policy record_scope on <domain_table>
   using (
-    client_company_id = current_setting('eden.active_client')::uuid
+    current_setting('eden.party_kind') <> 'partner'
     and (
-      -- consultancy member must be assigned to this client
-      exists (select 1 from consultancy_client_assignment a
-              where a.principal_id = current_setting('eden.principal')::uuid
-                and a.client_company_id = <domain_table>.client_company_id
-                and a.status='active'
-                and current_date between a.valid_from and coalesce(a.valid_to, current_date))
-      -- OR a client/native principal whose home company matches
-      or exists (select 1 from principals p
-              where p.id = current_setting('eden.principal')::uuid
-                and p.home_party='client'
-                and p.home_party_id = <domain_table>.client_company_id)
-      -- OR a partner, restricted to referred clients AND recruitment module
-      or exists (select 1 from referrals r
-              where r.client_company_id = <domain_table>.client_company_id
-                and r.partner_id = (select home_party_id from principals
-                                    where id=current_setting('eden.principal')::uuid)
-                and r.status='active'
-                and '<module>' = 'recruitment')
+      current_setting('eden.record_scope') = 'all'
+      or (current_setting('eden.record_scope') = 'department'
+          and department_id = current_setting('eden.scope_dept')::uuid)
+      or (current_setting('eden.record_scope') = 'self'
+          and employee_id = current_setting('eden.scope_emp')::uuid)
+      -- team / legal_entity variants analogous
     )
-  )
-  with check ( client_company_id = current_setting('eden.active_client')::uuid );
+  );
 
--- Record-scope narrowing (department/team/self) layered as an additional
--- restrictive policy; field masking handled in the serialization layer.
+-- (b) Partner policy: recruitment tables only, referred + attributed only.
+--     Added ONLY to recruitment tables (vacancies, candidates,
+--     interviews, offers, candidate_referrals).
+create policy partner_recruitment on candidates
+  using (
+    current_setting('eden.party_kind') = 'partner'
+    and exists (
+      select 1 from candidate_referrals cr
+      where cr.candidate_id = candidates.id
+        and cr.partner_id = current_setting('eden.principal')::uuid
+    )
+  );
+-- Non-recruitment tables get NO partner policy → partners see nothing there.
 ```
+
+Field masking (clearance tiers, L4 PII for partners) is applied in the
+serialization layer regardless of what a query selects.
 
 ---
 
@@ -628,7 +771,7 @@ Enforced both by `sod_rules` at grant time and at action time in the PDP.
 | Tenancy | single `company_id` flag | Platform→Client→Entity→Dept graph | High |
 | AuthZ | flat roles, blanket RLS | Scoped RBAC + ABAC + clearance + masking | High |
 | Parties | 1 org | Consultancy + Clients + Partners + Auditor | High |
-| Isolation | one DB | Pooled-RLS default + silo promotion path | Medium |
+| Isolation | one DB | Schema-per-client + control plane + provisioner | High |
 | Audit | activity log | Immutable hash-chained audit + access log | Medium |
 | Compliance | rule engine | + DPDP consent, retention, legal hold | Medium |
 | Billing | none | Client subscriptions + partner commissions | Medium |
@@ -643,30 +786,43 @@ should be.
 
 ## 12. Proposed build phases (after we agree the design)
 
-1. **P0 – Identity & tenancy core:** principals, tenancy graph, OIDC/MFA,
-   tenant switcher, RLS skeleton. No HR features yet.
+1. **P0 – Control plane & tenant provisioning:** `eden_control` schema,
+   principals, tenancy graph, OIDC/MFA, **tenant router + schema
+   provisioner + migration runner**, tenant switcher. Prove: create a
+   client → schema appears → request routed into it. No HR features yet.
 2. **P1 – Authorization engine:** permissions, roles, scoped assignments,
-   PDP, clearance + field masking, audit log. Ship with one module
-   (recruitment) end-to-end behind the new authz.
-3. **P2 – Migrate HR domain** (employee, attendance, leave, payroll,
-   compliance) onto tenancy keys + PDP. Reuse validated logic.
-4. **P3 – Partner portal** (referred-clients TA view, commissions).
+   PDP, clearance + field masking, hash-chained audit log. Ship one module
+   (recruitment) end-to-end inside a tenant schema behind the new authz.
+3. **P2 – Port HR domain** (employee, attendance, leave, payroll,
+   compliance) into the tenant-schema template as reusable libraries +
+   intra-schema RLS. Reuse validated math.
+4. **P3 – Partner bridge portal:** full referred-client recruitment
+   transparency, candidate referral submission, commissions.
 5. **P4 – Governance:** SoD, access reviews, break-glass, DPDP consent &
    retention, billing.
-6. **P5 – Scale:** silo-promotion for enterprise clients, analytics DW,
-   service extraction where justified.
+6. **P5 – Scale:** dedicated DB/region promotion for enterprise clients,
+   analytics DW, service extraction where justified, white-label enable.
 
 ---
 
-## 13. Open decisions (need your input before P0)
+## 13. Next-round questions (to lock before P0 build)
 
-1. **One consultancy or white-label many?** Does EDEN serve only *your*
-   consultancy, or will other consultancies run on it as a white-label
-   platform? This sets the top of the tenancy graph.
-2. **Default isolation:** pooled-RLS (recommended) with silo *promotion*
-   for enterprise — agree?
-3. **Build approach:** evolve the current Flask/Supabase prototype, or
-   greenfield on this architecture reusing only the HR-domain logic?
-4. **Partner depth:** read-only TA *visibility + commissions* only
-   (recommended), or do partners actively *manage* candidates (submit,
-   move stages) for referred clients?
+Core forks are locked (§0.1). These refine P0/P1:
+
+1. **Tech stack for greenfield.** Recommended:
+   **Postgres + a typed backend (Python/FastAPI or Node/TypeScript) +
+   a real PDP (OPA or Cedar) + React** front-end. Which backend language
+   does your team prefer to maintain long-term?
+2. **Auth provider.** Build on a managed identity provider
+   (Auth0/Clerk/Supabase Auth/AWS Cognito) for OIDC+MFA+SCIM, or
+   self-host (Keycloak)? Affects P0 speed vs control.
+3. **Connection strategy for schema-per-client.** Recommended: one pooled
+   role + `SET search_path` per request (cheap, scales to thousands of
+   clients). Confirm acceptable, vs per-client DB roles (stronger DB-level
+   isolation, heavier ops)?
+4. **Partner candidate referral flow.** When a partner submits a
+   candidate: goes straight into the client's pipeline as `sourced`, or
+   lands in a **consultancy review queue** first (recommended — keeps the
+   consultancy in control as the one doing the work)?
+5. **Hosting/residency.** India region only (DPDP-aligned), or
+   multi-region from day one?
