@@ -1,0 +1,45 @@
+# Local P0 stack: Postgres + Keycloak + the EDEN API.
+# India-region intent is configuration (EDEN_REGION); locally it's just labels.
+
+services:
+  db:
+    image: postgres:16
+    environment:
+      POSTGRES_DB: eden
+      POSTGRES_USER: eden_owner
+      POSTGRES_PASSWORD: eden_owner_pw
+    ports: ["5432:5432"]
+    volumes:
+      - eden_db:/var/lib/postgresql/data
+      - ./scripts/initdb:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U eden_owner -d eden"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  keycloak:
+    image: quay.io/keycloak/keycloak:25.0
+    command: ["start-dev"]
+    environment:
+      KC_BOOTSTRAP_ADMIN_USERNAME: admin
+      KC_BOOTSTRAP_ADMIN_PASSWORD: admin
+    ports: ["8080:8080"]
+
+  api:
+    build: .
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      EDEN_ENV: local
+      EDEN_REGION: ap-south-1
+      EDEN_DB_DSN: postgresql+asyncpg://eden_app:eden_app_pw@db:5432/eden
+      EDEN_DB_ADMIN_DSN: postgresql+asyncpg://eden_owner:eden_owner_pw@db:5432/eden
+      EDEN_OIDC_ISSUER: http://keycloak:8080/realms/eden
+      EDEN_OIDC_JWKS_URL: http://keycloak:8080/realms/eden/protocol/openid-connect/certs
+      EDEN_OIDC_AUDIENCE: eden-api
+    ports: ["8000:8000"]
+
+volumes:
+  eden_db:

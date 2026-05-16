@@ -5,3 +5,10 @@ __pycache__/
 .venv/
 .pytest_cache/
 server/uploads/
+
+# EDEN service
+.env
+eden/.env
+*.egg-info/
+.ruff_cache/
+.mypy_cache/
