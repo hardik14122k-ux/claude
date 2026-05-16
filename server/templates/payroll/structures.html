@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+{% block title %}Salary structures{% endblock %}
+{% block content %}
+<h1>Salary structures</h1>
+<table class="data">
+  <thead><tr><th>Code</th><th>Name</th><th>Current CTC</th><th>Effective from</th><th></th></tr></thead>
+  <tbody>
+  {% for r in rows %}
+    <tr>
+      <td>{{ r.employee.employee_code }}</td>
+      <td>{{ r.employee.first_name }} {{ r.employee.last_name }}</td>
+      <td>{% if r.structure %}₹{{ "{:,.0f}".format(r.structure.ctc_annual) }}{% else %}<span class="muted">not set</span>{% endif %}</td>
+      <td>{{ r.structure.effective_from if r.structure else '—' }}</td>
+      <td><a class="btn small" href="{{ url_for('payroll.structure_edit', eid=r.employee.id) }}">Edit</a></td>
+    </tr>
+  {% else %}
+    <tr><td colspan="5" class="muted">No employees</td></tr>
+  {% endfor %}
+  </tbody>
+</table>
+{% endblock %}

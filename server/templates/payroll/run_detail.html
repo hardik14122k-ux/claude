@@ -1,0 +1,47 @@
+{% extends "base.html" %}
+{% block title %}Run {{ "%02d"|format(run.month) }}/{{ run.year }}{% endblock %}
+{% block content %}
+<div class="page-head">
+  <h1>Payroll run — {{ "%02d"|format(run.month) }}/{{ run.year }}
+    <span class="pill pill-{{ run.status }}">{{ run.status }}</span>
+  </h1>
+  <div>
+    {% if run.status in ('draft','processed') %}
+      <form method="post" action="{{ url_for('payroll.run_process', run_id=run.id) }}" style="display:inline">
+        <button class="btn primary" type="submit">Process payslips</button>
+      </form>
+    {% endif %}
+    {% if run.status == 'processed' %}
+      <form method="post" action="{{ url_for('payroll.run_approve', run_id=run.id) }}" style="display:inline">
+        <button class="btn" type="submit">Approve</button>
+      </form>
+    {% endif %}
+    {% if run.status in ('approved','paid') %}
+      <form method="post" action="{{ url_for('payroll.run_lock', run_id=run.id) }}" style="display:inline">
+        <button class="btn" type="submit">Lock</button>
+      </form>
+    {% endif %}
+  </div>
+</div>
+
+<table class="data">
+  <thead><tr>
+    <th>Code</th><th>Employee</th><th>Paid days</th><th>Gross</th><th>Deductions</th><th>Net</th><th></th>
+  </tr></thead>
+  <tbody>
+  {% for s in slips %}
+    <tr>
+      <td>{{ s.employee_code }}</td>
+      <td>{{ s.first_name }} {{ s.last_name }}</td>
+      <td>{{ s.paid_days }}/{{ s.working_days }}</td>
+      <td>₹{{ "{:,.2f}".format(s.gross_earnings) }}</td>
+      <td>₹{{ "{:,.2f}".format(s.total_deductions) }}</td>
+      <td><strong>₹{{ "{:,.2f}".format(s.net_pay) }}</strong></td>
+      <td><a class="btn small" href="{{ url_for('payroll.payslip_detail', pid=s.id) }}">View</a></td>
+    </tr>
+  {% else %}
+    <tr><td colspan="7" class="muted">Process the run to generate payslips.</td></tr>
+  {% endfor %}
+  </tbody>
+</table>
+{% endblock %}

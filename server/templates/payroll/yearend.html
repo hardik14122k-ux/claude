@@ -1,0 +1,37 @@
+{% extends "base.html" %}
+{% block title %}Year-end FY {{ fy }}{% endblock %}
+{% block content %}
+<h1>Year-end — {{ employee.first_name }} {{ employee.last_name }} (FY {{ fy }}–{{ fy+1 }})</h1>
+
+<div class="grid two">
+  <div class="card">
+    <h3>Aggregated salary</h3>
+    <dl class="kv">
+      <dt>Months paid</dt><dd>{{ agg.months_paid }}</dd>
+      <dt>Gross salary</dt><dd>₹{{ "{:,.2f}".format(agg.gross_salary) }}</dd>
+      <dt>EPF (employee)</dt><dd>₹{{ "{:,.2f}".format(agg.epf_employee) }}</dd>
+      <dt>Professional tax</dt><dd>₹{{ "{:,.2f}".format(agg.professional_tax) }}</dd>
+      <dt>TDS deducted</dt><dd>₹{{ "{:,.2f}".format(agg.tds_deducted) }}</dd>
+    </dl>
+  </div>
+  <div class="card">
+    <h3>Regime comparison</h3>
+    <table class="data">
+      <tr><th></th><th>New regime</th><th>Old regime</th></tr>
+      <tr><td>Taxable</td><td>₹{{ "{:,.2f}".format(compare.new_regime.taxable_income) }}</td><td>₹{{ "{:,.2f}".format(compare.old_regime.taxable_income) }}</td></tr>
+      <tr><td>Tax + cess</td><td>₹{{ "{:,.2f}".format(compare.new_regime.tax_with_cess) }}</td><td>₹{{ "{:,.2f}".format(compare.old_regime.tax_with_cess) }}</td></tr>
+    </table>
+    <p>Recommended: <strong>{{ compare.recommended }}</strong> — saves ₹{{ "{:,.2f}".format(compare.savings) }}</p>
+  </div>
+</div>
+
+<div class="card">
+  <h3>Generate Form 16 record</h3>
+  <form method="post" action="{{ url_for('payroll.yearend_generate', eid=employee.id) }}" class="form-grid">
+    <input type="hidden" name="fy" value="{{ fy }}">
+    <input type="number" step="0.01" name="chapter_via" placeholder="80C/80D total (old regime)" value="0">
+    <select name="regime"><option value="new">New regime</option><option value="old">Old regime</option></select>
+    <button class="btn primary" type="submit">Generate Form 16</button>
+  </form>
+</div>
+{% endblock %}

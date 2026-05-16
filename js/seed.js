@@ -1,17 +1,26 @@
-// Demo data to populate the tracker so the dashboard feels alive.
+// Demo seed against Supabase. Inserts vacancies, candidates, interviews,
+// and lets DB triggers populate history + activity_logs + employees.
 
-import { createVacancy, createCandidate, scheduleInterview, moveCandidate, getState } from './store.js';
+import { sb } from './lib/supabase.js';
+import { unwrap } from './lib/errors.js';
+import { createVacancy } from './services/vacancies.js';
+import { createCandidate, moveCandidate } from './services/candidates.js';
+import { scheduleInterview } from './services/interviews.js';
 
-export function seedDemoData() {
-  const state = getState();
-  if (state.vacancies.length || state.candidates.length) return false;
+export async function seedDemoData() {
+  // Skip if any vacancies already exist.
+  const { count } = await sb.from('vacancies').select('*', { count: 'exact', head: true });
+  if (count && count > 0) return false;
 
-  const vacancies = [
-    { title: 'Senior Backend Engineer', department: 'Engineering', location: 'Bengaluru, IN', hiringManager: 'Priya Raman', openings: 2, priority: 'High',   targetClose: daysFromNow(14), skills: ['Python','PostgreSQL','AWS','Kubernetes'] },
-    { title: 'Product Designer',       department: 'Design',      location: 'Remote',       hiringManager: 'Alex Hughes', openings: 1, priority: 'Medium', targetClose: daysFromNow(21), skills: ['Figma','UX','Prototyping'] },
-    { title: 'Data Scientist',          department: 'Data',        location: 'London, UK',   hiringManager: 'Rahul Nair', openings: 1, priority: 'High',   targetClose: daysFromNow(10), skills: ['Python','PyTorch','SQL'] },
-    { title: 'Technical Recruiter',     department: 'People',      location: 'New York, US', hiringManager: 'Sara Owens', openings: 1, priority: 'Low',    targetClose: daysFromNow(30), skills: ['Sourcing','ATS','Greenhouse'] },
-  ].map(createVacancy);
+  const vacancies = [];
+  for (const v of [
+    { title: 'Senior Backend Engineer', department: 'Engineering', location: 'Bengaluru, IN', hiringManager: 'Priya Raman', openings: 2, priority: 'high',   targetClose: daysFromNow(14, true), skills: ['Python','PostgreSQL','AWS','Kubernetes'] },
+    { title: 'Product Designer',        department: 'Design',      location: 'Remote',        hiringManager: 'Alex Hughes', openings: 1, priority: 'medium', targetClose: daysFromNow(21, true), skills: ['Figma','UX','Prototyping'] },
+    { title: 'Data Scientist',          department: 'Data',        location: 'London, UK',    hiringManager: 'Rahul Nair',  openings: 1, priority: 'high',   targetClose: daysFromNow(10, true), skills: ['Python','PyTorch','SQL'] },
+    { title: 'Technical Recruiter',     department: 'People',      location: 'New York, US',  hiringManager: 'Sara Owens',  openings: 1, priority: 'low',    targetClose: daysFromNow(30, true), skills: ['Sourcing','ATS','Greenhouse'] },
+  ]) {
+    vacancies.push(await createVacancy(v));
+  }
 
   const names = [
     ['Ananya Iyer','ananya.iyer@example.com', ['Python','Django','PostgreSQL','AWS']],
@@ -27,12 +36,13 @@ export function seedDemoData() {
     ['Farah Aziz','farah.aziz@example.com', ['SQL','BigQuery','Python']],
     ['Leo Romano','leo.romano@example.com', ['React','Next.js','TypeScript']],
   ];
-
   const stages = ['sourced','sourced','screening','screening','interview','interview','offer','rejected','hired','screening','interview','sourced'];
 
-  names.forEach(([name, email, skills], i) => {
+  const created = [];
+  for (let i = 0; i < names.length; i++) {
+    const [name, email, skills] = names[i];
     const vac = vacancies[i % vacancies.length];
-    const cand = createCandidate({
+    const c = await createCandidate({
       name, email,
       phone: randomPhone(),
       location: vac.location,
@@ -43,51 +53,42 @@ export function seedDemoData() {
       source: i % 2 ? 'LinkedIn' : 'Referral',
       rating: (i % 5) + 1,
     });
-    // Move through history with realistic back-dates.
-    cand.history = backdate(cand.createdAt, stages[i]);
-    cand.stage = stages[i];
-  });
+    created.push(c);
+    // Walk the candidate through stages so triggers populate history + activity.
+    if (stages[i] !== 'sourced') await moveCandidate(c.id, stages[i]);
+  }
 
-  // A few interviews spread across the next week
-  const all = getState().candidates.slice(0, 5);
-  all.forEach((c, i) => scheduleInterview({
-    candidateId: c.id,
-    interviewer: ['Priya Raman','Alex Hughes','Rahul Nair','Sara Owens'][i % 4],
-    type: ['Screening','Technical','Culture','Final'][i % 4],
-    date: hoursFromNow((i + 1) * 20),
-    status: 'Scheduled',
-  }));
+  // A few interviews
+  for (let i = 0; i < 5; i++) {
+    await scheduleInterview({
+      candidateId: created[i].id,
+      interviewer: ['Priya Raman','Alex Hughes','Rahul Nair','Sara Owens'][i % 4],
+      type: ['screening','technical','culture','final'][i % 4],
+      scheduledAt: hoursFromNow((i + 1) * 20),
+      status: 'scheduled',
+    });
+  }
 
   return true;
 }
 
-function daysFromNow(d) { return new Date(Date.now() + d * 86400000).toISOString(); }
-function hoursFromNow(h) { return new Date(Date.now() + h * 3600000).toISOString(); }
-function randomPhone() { return '+1 ' + Math.floor(200 + Math.random() * 800) + '-' + Math.floor(1000 + Math.random() * 9000); }
+export async function resetAllData() {
+  // Order matters: respect FK direction.
+  for (const t of ['payroll','attendance','employees','interviews','candidates','vacancies','activity_logs']) {
+    await unwrap(sb.from(t).delete().neq('id', '00000000-0000-0000-0000-000000000000'), `Failed clearing ${t}`);
+  }
+}
 
+function daysFromNow(d, dateOnly = false) {
+  const t = new Date(Date.now() + d * 86400000);
+  return dateOnly ? t.toISOString().slice(0, 10) : t.toISOString();
+}
+function hoursFromNow(hh) { return new Date(Date.now() + hh * 3600000).toISOString(); }
+function randomPhone() { return '+1 ' + Math.floor(200 + Math.random() * 800) + '-' + Math.floor(1000 + Math.random() * 9000); }
 function headlineFor(skills) {
-  if (skills.some(s => /figma|ux|ui|product/i.test(s))) return 'Senior Product Designer';
-  if (skills.some(s => /torch|tensor|scikit/i.test(s))) return 'Machine Learning Engineer';
+  if (skills.some(s => /figma|ux|ui|product/i.test(s)))    return 'Senior Product Designer';
+  if (skills.some(s => /torch|tensor|scikit/i.test(s)))    return 'Machine Learning Engineer';
   if (skills.some(s => /sourcing|ats|greenhouse/i.test(s))) return 'Talent Acquisition Partner';
   if (skills.some(s => /react|next|typescript/i.test(s))) return 'Full-stack Engineer';
   return 'Senior Backend Engineer';
-}
-
-function backdate(createdAt, stage) {
-  const flow = ['sourced','screening','interview','offer','hired'];
-  const idx = flow.indexOf(stage);
-  const out = [];
-  if (idx >= 0) {
-    for (let i = 0; i <= idx; i++) {
-      const d = new Date(Date.now() - (idx - i + 1) * (3 + Math.random() * 5) * 86400000);
-      out.push({ stage: flow[i], at: d.toISOString(), from: i ? flow[i - 1] : undefined });
-    }
-  } else if (stage === 'rejected') {
-    out.push({ stage: 'sourced', at: new Date(Date.now() - 12 * 86400000).toISOString() });
-    out.push({ stage: 'screening', at: new Date(Date.now() - 9 * 86400000).toISOString(), from: 'sourced' });
-    out.push({ stage: 'rejected', at: new Date(Date.now() - 4 * 86400000).toISOString(), from: 'screening' });
-  } else {
-    out.push({ stage, at: createdAt });
-  }
-  return out;
 }
