@@ -18,6 +18,8 @@
 | 2 | Data isolation | **Dedicated Postgres schema per client (bridge model)** | Physical isolation. Control-plane schema (shared) + one tenant schema per client. Tenant router + schema provisioner required. |
 | 3 | Build approach | **Greenfield**, reuse only the validated HR-domain logic | New codebase on this architecture; port payroll/attendance/leave/compliance math as libraries. |
 | 4 | Partner depth | **Full transparency + can refer candidates** | Partner is a bridge/mediator: complete read visibility over the *entire recruitment process* for referred clients, may submit candidate referrals, sees own commissions — but performs none of the recruitment work (consultancy does). |
+| 5 | Backend stack | **Python / FastAPI** (Postgres, typed, async) | Greenfield service in FastAPI; HR-domain math ported as pure Python libraries. PDP via OPA/Cedar sidecar or in-process policy lib (TBD §13). |
+| 6 | Partner referral flow | **Consultancy review queue** (not direct-to-pipeline) | Partner-submitted candidates land in a consultancy triage queue; a consultancy recruiter accepts/rejects before the candidate enters the client pipeline. Consultancy stays in control of the work. |
 
 ---
 
@@ -670,9 +672,19 @@ Differences vs the prototype tables:
   boundary within a client).
 - Every table gets the intra-schema RLS in §8 for record-scope + partner
   restriction.
-- `candidate_referrals` is new: `(candidate_id, partner_id, referred_at,
-  status)` so partner-sourced candidates are attributed for commissions
-  and the partner can see only their pipeline.
+- `candidate_referrals` is new and models the **consultancy review
+  queue**:
+  `(id, partner_id, raw_candidate jsonb, candidate_id nullable,
+  status, reviewed_by, reviewed_at, reject_reason, referred_at)`.
+  - A partner submission inserts a row with `status='pending_review'`
+    and the raw candidate payload — **no `candidates` row yet**, so an
+    unvetted referral never appears in the client pipeline.
+  - A consultancy recruiter triages: **accept** → creates the
+    `candidates` row (`source='partner_referral'`), links
+    `candidate_id`, sets `status='accepted'`; **reject** → sets
+    `status='rejected'` + `reject_reason`.
+  - Commission accrual keys off `accepted` referrals; the partner sees
+    only their own referral rows + the resulting pipeline.
 
 ---
 
@@ -786,10 +798,11 @@ should be.
 
 ## 12. Proposed build phases (after we agree the design)
 
-1. **P0 – Control plane & tenant provisioning:** `eden_control` schema,
-   principals, tenancy graph, OIDC/MFA, **tenant router + schema
-   provisioner + migration runner**, tenant switcher. Prove: create a
-   client → schema appears → request routed into it. No HR features yet.
+1. **P0 – Control plane & tenant provisioning** *(FastAPI service)*:
+   `eden_control` schema, principals, tenancy graph, OIDC/MFA, **tenant
+   router (per-request `search_path`) + schema provisioner + migration
+   runner**, tenant switcher. Prove: create a client → schema appears →
+   request routed into it. No HR features yet.
 2. **P1 – Authorization engine:** permissions, roles, scoped assignments,
    PDP, clearance + field masking, hash-chained audit log. Ship one module
    (recruitment) end-to-end inside a tenant schema behind the new authz.
@@ -797,7 +810,8 @@ should be.
    compliance) into the tenant-schema template as reusable libraries +
    intra-schema RLS. Reuse validated math.
 4. **P3 – Partner bridge portal:** full referred-client recruitment
-   transparency, candidate referral submission, commissions.
+   transparency, candidate referral submission → **consultancy review
+   queue** (triage/accept/reject) → pipeline, commissions.
 5. **P4 – Governance:** SoD, access reviews, break-glass, DPDP consent &
    retention, billing.
 6. **P5 – Scale:** dedicated DB/region promotion for enterprise clients,
@@ -807,22 +821,19 @@ should be.
 
 ## 13. Next-round questions (to lock before P0 build)
 
-Core forks are locked (§0.1). These refine P0/P1:
+Core forks + stack + referral flow are locked (§0.1). Three refinements
+remain before P0 build:
 
-1. **Tech stack for greenfield.** Recommended:
-   **Postgres + a typed backend (Python/FastAPI or Node/TypeScript) +
-   a real PDP (OPA or Cedar) + React** front-end. Which backend language
-   does your team prefer to maintain long-term?
+1. **PDP form factor.** With FastAPI: an **OPA/Cedar sidecar**
+   (language-agnostic policy, network hop) or an **in-process Python
+   policy engine** (simpler ops, no hop)? Recommended: in-process for P0,
+   keep the policy interface swappable.
 2. **Auth provider.** Build on a managed identity provider
-   (Auth0/Clerk/Supabase Auth/AWS Cognito) for OIDC+MFA+SCIM, or
-   self-host (Keycloak)? Affects P0 speed vs control.
+   (Auth0/Clerk/AWS Cognito) for OIDC+MFA+SCIM, or self-host
+   (Keycloak)? Affects P0 speed vs control.
 3. **Connection strategy for schema-per-client.** Recommended: one pooled
    role + `SET search_path` per request (cheap, scales to thousands of
    clients). Confirm acceptable, vs per-client DB roles (stronger DB-level
    isolation, heavier ops)?
-4. **Partner candidate referral flow.** When a partner submits a
-   candidate: goes straight into the client's pipeline as `sourced`, or
-   lands in a **consultancy review queue** first (recommended — keeps the
-   consultancy in control as the one doing the work)?
-5. **Hosting/residency.** India region only (DPDP-aligned), or
+4. **Hosting/residency.** India region only (DPDP-aligned), or
    multi-region from day one?
