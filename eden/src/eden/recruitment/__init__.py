@@ -1,3 +1,4 @@
+from eden.recruitment import cv_parser, matcher
 from eden.recruitment.router import router
 from eden.recruitment.state_machine import (
     IllegalTransition,
@@ -12,4 +13,6 @@ __all__ = [
     "apply_transition",
     "is_terminal",
     "permission_for",
+    "cv_parser",
+    "matcher",
 ]
