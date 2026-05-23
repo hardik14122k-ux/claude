@@ -106,7 +106,7 @@ def _decode_best(data: bytes) -> str:
 
 
 def parse_cv(text: str, file_name: str = "") -> dict:
-    cleaned = text.replace("\r", "").replace("\u00a0", " ")
+    cleaned = text.replace("\r", "").replace(" ", " ")
     lines = [l.strip() for l in cleaned.split("\n") if l.strip()]
 
     email_m = EMAIL_RE.search(cleaned)

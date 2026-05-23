@@ -82,7 +82,6 @@ def score(
     matched, missing = [], []
     for s in jd_skills:
         s_low = s.lower()
-        # Consider it matched if it's in parsed skills OR appears in the raw CV text.
         if s_low in cv_skill_lookup or re.search(rf"(?:^|[^a-z0-9+#]){re.escape(s_low)}(?:$|[^a-z0-9+#])", cv_lower):
             matched.append(s)
         else:
@@ -92,7 +91,6 @@ def score(
     if total_jd_skills:
         skill_match = len(matched) / total_jd_skills
     else:
-        # Fallback: overlap ratio between JD and CV token bags for skill-less JDs.
         jd_tokens = _tokens(jd_text)
         cv_tokens = _tokens(cv_text)
         skill_match = len(jd_tokens & cv_tokens) / max(1, len(jd_tokens))
@@ -129,7 +127,7 @@ def rank_candidate_against_all(candidate: dict, vacancies: list[dict]) -> list[d
     ranked = []
     for v in vacancies:
         if not (v.get("description") or v.get("skills")):
-            continue  # no JD data — skip
+            continue
         ranked.append({"vacancy": v, "match": score(candidate, v)})
     ranked.sort(key=lambda r: r["match"]["total"], reverse=True)
     return ranked

@@ -1,1 +1,0 @@
-"""TalentTrack — Flask recruitment tracker."""
