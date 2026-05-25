@@ -12,3 +12,6 @@ eden/.env
 *.egg-info/
 .ruff_cache/
 .mypy_cache/
+
+# graphify knowledge-graph artifacts
+graphify-out/
