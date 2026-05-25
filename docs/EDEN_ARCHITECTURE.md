@@ -27,6 +27,26 @@
 
 ---
 
+## 0.2 Architectural diagrams (visual)
+
+Source files are draw.io "Editable SVG" — both render on GitHub and open
+directly in the [draw.io](https://app.diagrams.net) editor. See
+[`diagrams/README.md`](diagrams/README.md) for editing instructions.
+
+| # | Diagram | Covered in section |
+|---|---------|--------------------|
+| 1 | [Principal hierarchy](diagrams/01-principal-hierarchy.drawio.svg) — 5-party RBAC | §1 |
+| 2 | [Tenant isolation](diagrams/02-tenant-isolation.drawio.svg) — control plane + per-client schemas | §5 |
+| 3 | [Recruitment data flow](diagrams/03-data-flow-recruitment.drawio.svg) — partner → consultancy → client | §4 (partner), Recruitment slice |
+| 4 | [Deployment topology](diagrams/04-deployment-topology.drawio.svg) — FastAPI + Postgres + Keycloak, India region | §6, §0.1 #9 |
+| 5 | [Authorization stack](diagrams/05-authorization-stack.drawio.svg) — Keycloak → principal → PDP → RLS | §4, §7, §8 |
+
+All five start as TODO placeholders and get filled in as decisions firm up.
+A diagram drifting out of sync with its prose section is a bug — update both
+in the same commit.
+
+---
+
 ## 0. Why the current prototype is not enough
 
 The working prototype proves the HR domain logic (recruitment → employee →

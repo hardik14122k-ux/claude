@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink"
+     width="700" height="180" viewBox="0 0 700 180"
+     content="&lt;mxfile host=&quot;app.diagrams.net&quot;&gt;&lt;diagram name=&quot;Page-1&quot; id=&quot;05-authorization-stack&quot;&gt;&lt;mxGraphModel dx=&quot;800&quot; dy=&quot;600&quot; grid=&quot;1&quot; gridSize=&quot;10&quot; guides=&quot;1&quot; tooltips=&quot;1&quot; connect=&quot;1&quot; arrows=&quot;1&quot; fold=&quot;1&quot; page=&quot;1&quot; pageScale=&quot;1&quot; pageWidth=&quot;850&quot; pageHeight=&quot;1100&quot; math=&quot;0&quot; shadow=&quot;0&quot;&gt;&lt;root&gt;&lt;mxCell id=&quot;0&quot;/&gt;&lt;mxCell id=&quot;1&quot; parent=&quot;0&quot;/&gt;&lt;mxCell id=&quot;2&quot; value=&quot;TODO: Authorization stack&quot; style=&quot;text;html=1;align=center;verticalAlign=middle;fontSize=18;fontStyle=1&quot; vertex=&quot;1&quot; parent=&quot;1&quot;&gt;&lt;mxGeometry x=&quot;200&quot; y=&quot;80&quot; width=&quot;450&quot; height=&quot;40&quot; as=&quot;geometry&quot;/&gt;&lt;/mxCell&gt;&lt;mxCell id=&quot;3&quot; value=&quot;Keycloak -&gt; principal -&gt; PDP -&gt; intra-schema RLS; defense in depth&quot; style=&quot;text;html=1;align=center;verticalAlign=middle;fontSize=12;fontColor=#666666&quot; vertex=&quot;1&quot; parent=&quot;1&quot;&gt;&lt;mxGeometry x=&quot;200&quot; y=&quot;125&quot; width=&quot;450&quot; height=&quot;30&quot; as=&quot;geometry&quot;/&gt;&lt;/mxCell&gt;&lt;/root&gt;&lt;/mxGraphModel&gt;&lt;/diagram&gt;&lt;/mxfile&gt;">
+  <rect width="700" height="180" fill="#fafafa" stroke="#dddddd" stroke-width="1"/>
+  <text x="350" y="70" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, system-ui, sans-serif" font-size="18" font-weight="700" fill="#333">
+    TODO: Authorization stack
+  </text>
+  <text x="350" y="100" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, system-ui, sans-serif" font-size="13" fill="#666">
+    Keycloak -&gt; principal -&gt; PDP -&gt; intra-schema RLS; defense in depth
+  </text>
+  <text x="350" y="140" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, system-ui, sans-serif" font-size="11" fill="#999">
+    Open in app.diagrams.net or VS Code (Draw.io Integration extension) to edit
+  </text>
+</svg>
