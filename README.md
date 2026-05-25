@@ -33,3 +33,19 @@ delivered as an API on the new architecture.
 This repo previously hosted a single-tenant browser+Flask prototype
 ("talenttrack"). It was removed at the v0.1.0 cleanup; see `docs/SALVAGE.md`
 for what was salvaged and how to retrieve anything else from git history.
+
+## Knowledge graph (local tooling, optional)
+
+A [graphify](https://github.com/safishamsi/graphify) knowledge graph of this
+repo can be built locally — Claude Code consults it before grepping files, so
+queries about the codebase are cheaper and more accurate. Outputs live in
+`graphify-out/` (gitignored).
+
+Run `/graphify --update` after meaningful changes:
+
+- **Code-only changes** → free (AST re-runs, no LLM tokens).
+- **Doc changes** (`docs/EDEN_ARCHITECTURE.md`, this README, `CHANGELOG.md`,
+  `docs/SALVAGE.md`, `eden/README.md`, `eden/docker-compose.yml`) → costs
+  tokens (LLM semantic re-extraction).
+
+If `graphify-out/` doesn't exist, run `/graphify .` once to build it.
