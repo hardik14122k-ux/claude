@@ -35,7 +35,7 @@ class Principal(ControlBase, AuditMixin):
     display_name: Mapped[str | None] = mapped_column(String(256), nullable=True)
 
     home_party: Mapped[PartyKind] = mapped_column(
-        Enum(PartyKind, name="party_kind"), nullable=False
+        Enum(PartyKind, name="party_kind", inherit_schema=True), nullable=False
     )
     # consultancy_id / tenant_id / partner_id depending on home_party.
     home_party_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), nullable=False)

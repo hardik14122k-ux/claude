@@ -20,10 +20,15 @@ services:
 
   keycloak:
     image: quay.io/keycloak/keycloak:25.0
-    command: ["start-dev"]
+    # --import-realm loads keycloak/eden-realm.json on first start:
+    # realm, roles (matching the PDP role grants), demo users, and the
+    # eden-cli client with the eden_tenant claim + eden-api audience mappers.
+    command: ["start-dev", "--import-realm"]
     environment:
       KC_BOOTSTRAP_ADMIN_USERNAME: admin
       KC_BOOTSTRAP_ADMIN_PASSWORD: admin
+    volumes:
+      - ./keycloak:/opt/keycloak/data/import:ro
     ports: ["8080:8080"]
 
   api:
@@ -36,7 +41,11 @@ services:
       EDEN_REGION: ap-south-1
       EDEN_DB_DSN: postgresql+asyncpg://eden_app:eden_app_pw@db:5432/eden
       EDEN_DB_ADMIN_DSN: postgresql+asyncpg://eden_owner:eden_owner_pw@db:5432/eden
-      EDEN_OIDC_ISSUER: http://keycloak:8080/realms/eden
+      # Issuer is a STRING COMPARE against the token's iss claim. Tokens are
+      # fetched by humans/scripts from the host (localhost:8080), so Keycloak
+      # stamps localhost as issuer; JWKS is fetched server-side over the
+      # compose network, so it uses the keycloak hostname. Both are correct.
+      EDEN_OIDC_ISSUER: http://localhost:8080/realms/eden
       EDEN_OIDC_JWKS_URL: http://keycloak:8080/realms/eden/protocol/openid-connect/certs
       EDEN_OIDC_AUDIENCE: eden-api
     ports: ["8000:8000"]

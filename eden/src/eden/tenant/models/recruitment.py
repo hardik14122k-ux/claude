@@ -45,7 +45,14 @@ class CandidateReferral(TenantBase, AuditMixin):
     vacancy_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), nullable=True)
 
     state: Mapped[ReferralState] = mapped_column(
-        Enum(ReferralState, name="referral_state"),
+        # values_callable: persist the enum VALUES ('Draft', …) — the SQL
+        # template defines the pg type with values, while SQLAlchemy's
+        # default would send member NAMES ('DRAFT') and fail at runtime.
+        Enum(
+            ReferralState,
+            name="referral_state",
+            values_callable=lambda e: [m.value for m in e],
+        ),
         default=ReferralState.DRAFT,
         nullable=False,
     )

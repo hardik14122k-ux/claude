@@ -50,7 +50,7 @@ class AuditLog(ControlBase):
 
     # What happened.
     action: Mapped[AuditAction] = mapped_column(
-        Enum(AuditAction, name="audit_action"), nullable=False
+        Enum(AuditAction, name="audit_action", inherit_schema=True), nullable=False
     )
     resource_type: Mapped[str] = mapped_column(String(128), nullable=False)
     resource_id: Mapped[str | None] = mapped_column(String(128), nullable=True)

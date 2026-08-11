@@ -72,12 +72,12 @@ class Tenant(ControlBase, AuditMixin):
     slug: Mapped[str] = mapped_column(String(63), nullable=False)
     legal_name: Mapped[str] = mapped_column(String(256), nullable=False)
     status: Mapped[TenantStatus] = mapped_column(
-        Enum(TenantStatus, name="tenant_status"), default=TenantStatus.pending, nullable=False
+        Enum(TenantStatus, name="tenant_status", inherit_schema=True), default=TenantStatus.pending, nullable=False
     )
 
     # --- Subscription ------------------------------------------------------
     subscription_tier: Mapped[SubscriptionTier] = mapped_column(
-        Enum(SubscriptionTier, name="subscription_tier"),
+        Enum(SubscriptionTier, name="subscription_tier", inherit_schema=True),
         default=SubscriptionTier.trial,
         nullable=False,
     )
@@ -115,7 +115,7 @@ class TenantSchema(ControlBase, AuditMixin):
     )
     schema_name: Mapped[str] = mapped_column(String(63), unique=True, nullable=False)
     status: Mapped[SchemaStatus] = mapped_column(
-        Enum(SchemaStatus, name="schema_status"), default=SchemaStatus.pending, nullable=False
+        Enum(SchemaStatus, name="schema_status", inherit_schema=True), default=SchemaStatus.pending, nullable=False
     )
     provisioned_at: Mapped[str | None] = mapped_column(String(64), nullable=True)
     last_error: Mapped[str | None] = mapped_column(Text, nullable=True)

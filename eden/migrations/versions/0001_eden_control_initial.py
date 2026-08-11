@@ -30,17 +30,21 @@ depends_on: str | Sequence[str] | None = None
 
 CONTROL_SCHEMA = "eden_control"
 
-_WORM_TRIGGER = f"""
+# NOTE: one statement per op.execute() — the asyncpg driver rejects
+# multi-command strings (prepared-statement protocol).
+_WORM_FUNCTION = f"""
 CREATE OR REPLACE FUNCTION {CONTROL_SCHEMA}.audit_logs_block_mutation()
 RETURNS trigger LANGUAGE plpgsql AS $$
 BEGIN
     RAISE EXCEPTION 'audit_logs is append-only (WORM); % rejected', TG_OP;
 END;
-$$;
+$$
+"""
 
+_WORM_TRIGGER = f"""
 CREATE TRIGGER trg_audit_logs_worm
 BEFORE UPDATE OR DELETE OR TRUNCATE ON {CONTROL_SCHEMA}.audit_logs
-FOR EACH STATEMENT EXECUTE FUNCTION {CONTROL_SCHEMA}.audit_logs_block_mutation();
+FOR EACH STATEMENT EXECUTE FUNCTION {CONTROL_SCHEMA}.audit_logs_block_mutation()
 """
 
 _BITEMPORAL_CURRENT_UNIQUE = f"""
@@ -76,6 +80,7 @@ def upgrade() -> None:
     bind = op.get_bind()
     op.execute(f'CREATE SCHEMA IF NOT EXISTS "{CONTROL_SCHEMA}"')
     ControlBase.metadata.create_all(bind=bind)
+    op.execute(_WORM_FUNCTION)
     op.execute(_WORM_TRIGGER)
     op.execute(_BITEMPORAL_CURRENT_UNIQUE)
     op.execute(_APP_ROLE_GRANTS)

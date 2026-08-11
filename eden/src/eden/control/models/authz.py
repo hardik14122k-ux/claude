@@ -70,7 +70,7 @@ class RolePermission(ControlBase, AuditMixin):
         ForeignKey("permissions.code", ondelete="CASCADE"), primary_key=True
     )
     effect: Mapped[Effect] = mapped_column(
-        Enum(Effect, name="authz_effect"), default=Effect.allow, nullable=False
+        Enum(Effect, name="authz_effect", inherit_schema=True), default=Effect.allow, nullable=False
     )
 
 
@@ -86,7 +86,7 @@ class RoleAssignment(ControlBase, AuditMixin):
     role_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("roles.id"), nullable=False)
 
     scope_type: Mapped[ScopeType] = mapped_column(
-        Enum(ScopeType, name="authz_scope_type"), nullable=False
+        Enum(ScopeType, name="authz_scope_type", inherit_schema=True), nullable=False
     )
     scope_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), nullable=True)
     module_mask: Mapped[list[str] | None] = mapped_column(ARRAY(String), nullable=True)

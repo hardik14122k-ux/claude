@@ -38,6 +38,13 @@ engine = create_async_engine(
     max_overflow=_settings.db_max_overflow,
     pool_timeout=_settings.db_pool_timeout,
     pool_pre_ping=True,
+    # CRITICAL for schema-per-tenant: asyncpg caches prepared statements per
+    # connection, binding unqualified enum/type names to the OID of whichever
+    # tenant schema the connection saw FIRST. A pooled connection reused for a
+    # different tenant then fails with "cannot cast type client_<a>.x to x".
+    # Disabling the cache re-resolves types against the current search_path
+    # on every execution. (Same recipe as required behind PgBouncer.)
+    connect_args={"prepared_statement_cache_size": 0},
 )
 admin_engine = create_async_engine(_settings.db_admin_dsn, isolation_level="AUTOCOMMIT")
 
