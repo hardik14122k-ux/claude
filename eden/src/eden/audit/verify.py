@@ -32,6 +32,6 @@ if __name__ == "__main__":
         raise SystemExit(asyncio.run(_main()))
     except SystemExit:
         raise
-    except Exception as exc:  # noqa: BLE001 - CLI boundary
+    except Exception as exc:
         print(f"verification failed to run: {exc}", file=sys.stderr)
         raise SystemExit(2) from exc

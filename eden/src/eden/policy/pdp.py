@@ -9,7 +9,7 @@ dataclasses.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Protocol, runtime_checkable
+from typing import ClassVar, Protocol, runtime_checkable
 
 from eden.security.principal import AuthContext
 
@@ -30,11 +30,11 @@ class Decision:
     obligations: tuple[str, ...] = ()
 
     @classmethod
-    def allow(cls, reason: str = "permitted") -> "Decision":
+    def allow(cls, reason: str = "permitted") -> Decision:
         return cls(True, reason)
 
     @classmethod
-    def deny(cls, reason: str) -> "Decision":
+    def deny(cls, reason: str) -> Decision:
         return cls(False, reason)
 
 
@@ -52,7 +52,7 @@ class InProcessPolicyEngine:
     """
 
     # Coarse Keycloak realm/client roles that imply a fine permission in P0.
-    _ROLE_GRANTS: dict[str, frozenset[str]] = {
+    _ROLE_GRANTS: ClassVar[dict[str, frozenset[str]]] = {
         "consultancy_recruiter": frozenset(
             {"candidates:review", "candidates:read", "referrals:read"}
         ),

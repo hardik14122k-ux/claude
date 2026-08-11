@@ -37,7 +37,7 @@ class AuthContext:
         tenant_schema: str,
         request_id: str,
         source_ip: str | None,
-    ) -> "AuthContext":
+    ) -> AuthContext:
         return cls(
             keycloak_sub=claims.subject,
             principal_id=principal_id,

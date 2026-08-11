@@ -62,10 +62,9 @@ def assert_valid_tenant_schema(schema: str) -> str:
 @asynccontextmanager
 async def control_session() -> AsyncIterator[AsyncSession]:
     """Unit-of-work session pinned to the shared control plane (no tenant data)."""
-    async with AppSessionFactory() as session:
-        async with session.begin():
-            await session.execute(text(f'SET LOCAL search_path = "{_CONTROL_SCHEMA}"'))
-            yield session
+    async with AppSessionFactory() as session, session.begin():
+        await session.execute(text(f'SET LOCAL search_path = "{_CONTROL_SCHEMA}"'))
+        yield session
 
 
 @asynccontextmanager
@@ -78,9 +77,8 @@ async def tenant_session(schema: str) -> AsyncIterator[AsyncSession]:
     guarantees the search_path dies with the transaction.
     """
     assert_valid_tenant_schema(schema)
-    async with AppSessionFactory() as session:
-        async with session.begin():
-            await session.execute(
-                text(f'SET LOCAL search_path = "{schema}", "{_CONTROL_SCHEMA}"')
-            )
-            yield session
+    async with AppSessionFactory() as session, session.begin():
+        await session.execute(
+            text(f'SET LOCAL search_path = "{schema}", "{_CONTROL_SCHEMA}"')
+        )
+        yield session

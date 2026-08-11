@@ -15,7 +15,7 @@ from sqlalchemy import func, select, text
 
 from eden.audit import logger as audit
 from eden.config import get_settings
-from eden.control.models.audit import AuditAction, AuditLog
+from eden.control.models.audit import AuditAction
 from eden.control.models.tenant import Consultancy, Tenant, TenantStatus
 from eden.db.session import admin_engine, control_session, tenant_session
 from eden.provisioning import provision_tenant

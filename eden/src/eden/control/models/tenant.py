@@ -100,7 +100,7 @@ class Tenant(ControlBase, AuditMixin):
     # e.g. {"candidates_days": 730, "payslips_years": 8, "audit_years": 8}
     retention_policy: Mapped[dict] = mapped_column(JSONB, default=dict, nullable=False)
 
-    schema: Mapped["TenantSchema"] = relationship(
+    schema: Mapped[TenantSchema] = relationship(
         back_populates="tenant", uselist=False, cascade="all, delete-orphan"
     )
 
@@ -121,7 +121,7 @@ class TenantSchema(ControlBase, AuditMixin):
     last_error: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     tenant: Mapped[Tenant] = relationship(back_populates="schema")
-    versions: Mapped[list["TenantSchemaVersion"]] = relationship(
+    versions: Mapped[list[TenantSchemaVersion]] = relationship(
         back_populates="tenant_schema", cascade="all, delete-orphan"
     )
 

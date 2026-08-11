@@ -27,7 +27,7 @@ from starlette.responses import JSONResponse, Response
 
 from eden.config import get_settings
 from eden.control.models.principal import Principal
-from eden.control.models.tenant import SchemaStatus, TenantSchema, TenantStatus, Tenant
+from eden.control.models.tenant import SchemaStatus, Tenant, TenantSchema, TenantStatus
 from eden.db.session import control_session
 from eden.security.keycloak import TokenVerificationError, verify_token
 from eden.security.principal import AuthContext

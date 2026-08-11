@@ -13,7 +13,7 @@ Each component is 0–1, then scaled to 0–100.
 from __future__ import annotations
 
 import re
-from typing import Iterable
+from collections.abc import Iterable
 
 STOPWORDS = {
     "the","a","an","and","or","of","in","to","for","with","on","at","by","as","is","are","was",

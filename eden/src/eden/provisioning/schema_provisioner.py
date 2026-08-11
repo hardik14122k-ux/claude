@@ -15,7 +15,7 @@ from __future__ import annotations
 
 import hashlib
 import re
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 from sqlalchemy import select, text
@@ -173,10 +173,10 @@ async def provision_tenant(tenant_id: str) -> str:
                 )
             ).scalar_one()
             ts.status = SchemaStatus.ready
-            ts.provisioned_at = datetime.now(timezone.utc).isoformat()
+            ts.provisioned_at = datetime.now(UTC).isoformat()
         return schema
 
-    except Exception as exc:  # noqa: BLE001 - record failure for retry then re-raise
+    except Exception as exc:
         async with AppSessionFactory() as ctl, ctl.begin():
             await ctl.execute(text(f'SET LOCAL search_path = "{_settings.control_schema}"'))
             ts = (

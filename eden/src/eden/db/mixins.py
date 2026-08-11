@@ -11,7 +11,7 @@ version (sets valid_to, is_current=False) and inserts a new time-bound row.
 from __future__ import annotations
 
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from sqlalchemy import Boolean, DateTime, func
 from sqlalchemy.dialects.postgresql import UUID
@@ -19,7 +19,7 @@ from sqlalchemy.orm import Mapped, declarative_mixin, declared_attr, mapped_colu
 
 
 def utcnow() -> datetime:
-    return datetime.now(timezone.utc)
+    return datetime.now(UTC)
 
 
 @declarative_mixin

@@ -8,11 +8,11 @@ from eden.recruitment.state_machine import (
 )
 
 __all__ = [
-    "router",
     "IllegalTransition",
     "apply_transition",
-    "is_terminal",
-    "permission_for",
     "cv_parser",
+    "is_terminal",
     "matcher",
+    "permission_for",
+    "router",
 ]

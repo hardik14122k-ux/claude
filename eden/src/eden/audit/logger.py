@@ -21,7 +21,7 @@ from __future__ import annotations
 import hashlib
 import json
 import uuid
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 from sqlalchemy import select, text
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -31,7 +31,7 @@ from eden.db.mixins import utcnow
 from eden.security.principal import AuthContext
 
 _GENESIS = "0" * 64
-_EPOCH = datetime(1970, 1, 1, tzinfo=timezone.utc)
+_EPOCH = datetime(1970, 1, 1, tzinfo=UTC)
 # Advisory lock key for the audit chain. Two int32 args (classid, objid)
 # keep us clear of other users of the 64-bit advisory-lock keyspace.
 _CHAIN_LOCK = (0xED, 0x0A)

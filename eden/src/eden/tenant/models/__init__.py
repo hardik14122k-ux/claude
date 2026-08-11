@@ -11,10 +11,10 @@ from eden.tenant.models.recruitment import (
 )
 
 __all__ = [
-    "EmploymentTerm",
-    "PayrollBand",
     "Candidate",
     "CandidateReferral",
     "CandidateSource",
+    "EmploymentTerm",
+    "PayrollBand",
     "ReferralState",
 ]

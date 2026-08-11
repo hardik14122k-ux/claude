@@ -3,10 +3,10 @@ from eden.security.principal import AuthContext, get_auth
 from eden.security.scopes import RequiresScope
 
 __all__ = [
+    "AuthContext",
+    "RequiresScope",
     "TokenClaims",
     "TokenVerificationError",
-    "verify_token",
-    "AuthContext",
     "get_auth",
-    "RequiresScope",
+    "verify_token",
 ]
