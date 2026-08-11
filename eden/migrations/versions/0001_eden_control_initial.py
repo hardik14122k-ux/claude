@@ -49,6 +49,28 @@ ON {CONTROL_SCHEMA}.tenant_configurations (effective_key)
 WHERE is_current;
 """
 
+# The pooled application role (locked decision #10) needs USAGE + DML on the
+# control plane — it owns nothing and cannot CREATE, but the tenant router
+# reads tenant_schemas and the audit logger appends to audit_logs on every
+# request. Guarded so environments without the role (bare test DBs) still
+# migrate; ALTER DEFAULT PRIVILEGES covers tables added by later revisions.
+_APP_ROLE_GRANTS = f"""
+DO $$
+BEGIN
+    IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'eden_app') THEN
+        GRANT USAGE ON SCHEMA {CONTROL_SCHEMA} TO eden_app;
+        GRANT SELECT, INSERT, UPDATE, DELETE
+            ON ALL TABLES IN SCHEMA {CONTROL_SCHEMA} TO eden_app;
+        GRANT USAGE, SELECT
+            ON ALL SEQUENCES IN SCHEMA {CONTROL_SCHEMA} TO eden_app;
+        ALTER DEFAULT PRIVILEGES IN SCHEMA {CONTROL_SCHEMA}
+            GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO eden_app;
+        ALTER DEFAULT PRIVILEGES IN SCHEMA {CONTROL_SCHEMA}
+            GRANT USAGE, SELECT ON SEQUENCES TO eden_app;
+    END IF;
+END $$;
+"""
+
 
 def upgrade() -> None:
     bind = op.get_bind()
@@ -56,6 +78,7 @@ def upgrade() -> None:
     ControlBase.metadata.create_all(bind=bind)
     op.execute(_WORM_TRIGGER)
     op.execute(_BITEMPORAL_CURRENT_UNIQUE)
+    op.execute(_APP_ROLE_GRANTS)
 
 
 def downgrade() -> None:

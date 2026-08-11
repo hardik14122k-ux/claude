@@ -21,7 +21,9 @@ Experience
 
 
 def test_falls_back_to_email_local_for_name():
-    text = "alex.kim@example.com\nSome unrelated text here.\n"
+    # No line qualifies as a name (the email line is excluded by the
+    # heuristic), so the parser falls back to the email local-part.
+    text = "alex.kim@example.com\n"
     out = cv_parser.parse_cv(text)
     assert out["email"] == "alex.kim@example.com"
     assert "Alex" in out["name"]

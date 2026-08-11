@@ -15,6 +15,11 @@ from eden.security.keycloak import TokenClaims
 @dataclass(frozen=True, slots=True)
 class AuthContext:
     keycloak_sub: str
+    # Control-plane principals.id — resolved by the tenant router from the
+    # verified keycloak sub. All domain writes (partner_id, reviewed_by,
+    # created_by/updated_by, audit actor) reference THIS id, never a value
+    # derived from the token.
+    principal_id: uuid.UUID
     tenant_id: uuid.UUID
     tenant_schema: str
     email: str | None
@@ -28,12 +33,14 @@ class AuthContext:
         cls,
         claims: TokenClaims,
         *,
+        principal_id: uuid.UUID,
         tenant_schema: str,
         request_id: str,
         source_ip: str | None,
     ) -> "AuthContext":
         return cls(
             keycloak_sub=claims.subject,
+            principal_id=principal_id,
             tenant_id=claims.tenant_id,
             tenant_schema=tenant_schema,
             email=claims.email,

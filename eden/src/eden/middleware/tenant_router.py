@@ -26,6 +26,7 @@ from starlette.requests import Request
 from starlette.responses import JSONResponse, Response
 
 from eden.config import get_settings
+from eden.control.models.principal import Principal
 from eden.control.models.tenant import SchemaStatus, TenantSchema, TenantStatus, Tenant
 from eden.db.session import control_session
 from eden.security.keycloak import TokenVerificationError, verify_token
@@ -66,7 +67,11 @@ class TenantRoutingMiddleware(BaseHTTPMiddleware):
         except TokenVerificationError as exc:
             return _abort(401, "token_invalid", str(exc), request_id)
 
-        # (3) Resolve + validate the tenant schema from the control plane.
+        # (3) Resolve the tenant schema AND the principal from the control
+        #     plane in one session. Identity lives in Keycloak; the principals
+        #     row is its control-plane projection (created by seed/onboarding,
+        #     later SCIM). An authenticated-but-unregistered subject is
+        #     rejected — fail closed, never auto-invent a principal.
         try:
             async with control_session() as session:
                 row = (
@@ -76,6 +81,13 @@ class TenantRoutingMiddleware(BaseHTTPMiddleware):
                         .where(TenantSchema.tenant_id == claims.tenant_id)
                     )
                 ).first()
+                principal = (
+                    await session.execute(
+                        select(Principal).where(
+                            Principal.keycloak_sub == claims.subject
+                        )
+                    )
+                ).scalar_one_or_none()
         except Exception:  # noqa: BLE001 - control-plane lookup must not leak details
             return _abort(503, "control_plane_unavailable", "tenant lookup failed", request_id)
 
@@ -94,9 +106,18 @@ class TenantRoutingMiddleware(BaseHTTPMiddleware):
                 request_id,
             )
 
+        if principal is None:
+            return _abort(
+                403, "principal_unregistered",
+                "verified subject has no control-plane principal", request_id,
+            )
+        if not principal.is_active:
+            return _abort(403, "principal_inactive", "principal is deactivated", request_id)
+
         # (4) Attach the verified context. Handlers/DB read ONLY from here.
         request.state.auth = AuthContext.from_claims(
             claims,
+            principal_id=principal.id,
             tenant_schema=schema_row.schema_name,
             request_id=request_id,
             source_ip=request.client.host if request.client else None,

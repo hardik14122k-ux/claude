@@ -22,6 +22,9 @@ class Settings(BaseSettings):
     db_pool_timeout: int = 10
     # Privileged DSN for DDL only (Alembic + provisioner).
     db_admin_dsn: str
+    # The pooled application role. The provisioner grants it USAGE/DML per
+    # schema (locked decision #10: it never owns schemas or runs DDL).
+    db_app_role: str = "eden_app"
 
     # Keycloak (self-hosted) — locked decision #8.
     oidc_issuer: str
